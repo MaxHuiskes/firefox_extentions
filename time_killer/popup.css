@@ -1,0 +1,184 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  touch-action: manipulation; /* Voorkomt inzoomen bij dubbeltikken */
+}
+
+body {
+  width: 100%;
+  max-width: 400px;
+  background-color: #0f172a;
+  color: #f8fafc;
+  font-family: system-ui, -apple-system, sans-serif;
+  padding: 8px;
+  user-select: none;
+  margin: 0 auto;
+}
+
+.header h2 {
+  text-align: center;
+  font-size: 16px;
+  color: #38bdf8;
+  margin-bottom: 8px;
+}
+
+.game-container {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 65px;
+}
+
+.panel {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 4px;
+  text-align: center;
+}
+
+.panel-label {
+  font-size: 8px;
+  font-weight: bold;
+  color: #94a3b8;
+  margin-bottom: 2px;
+}
+
+.stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-label {
+  font-size: 7px;
+  color: #64748b;
+}
+
+.stat-item span:last-child {
+  font-size: 10px;
+  font-weight: bold;
+  color: #38bdf8;
+}
+
+.canvas-wrapper {
+  position: relative;
+}
+
+#tetrisCanvas {
+  background-color: #020617;
+  border: 2px solid #334155;
+  border-radius: 6px;
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+canvas {
+  image-rendering: pixelated;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.92);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  gap: 8px;
+  padding: 10px;
+  text-align: center;
+}
+
+.overlay.hidden {
+  display: none;
+}
+
+.overlay h3 {
+  color: #f43f5e;
+  font-size: 18px;
+}
+
+.overlay p {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  border-radius: 4px;
+  font-weight: bold;
+}
+
+#startBtn {
+  background: #0284c7;
+  color: white;
+  padding: 8px 16px;
+  font-size: 12px;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.btn {
+  background: #334155;
+  color: #e2e8f0;
+  padding: 6px 0;
+  font-size: 9px;
+}
+
+/* Touch Controls Layout */
+.touch-controls {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.touch-row {
+  display: flex;
+  gap: 6px;
+}
+
+.t-btn {
+  flex: 1;
+  padding: 12px 0;
+  background: #1e293b;
+  color: #f8fafc;
+  border: 1px solid #334155;
+  font-size: 11px;
+  border-radius: 6px;
+}
+
+.t-btn:active {
+  background: #334155;
+}
+
+.t-btn.accent {
+  background: #0284c7;
+  border-color: #0369a1;
+}
+
+.t-btn.warn {
+  background: #d97706;
+  border-color: #b45309;
+}

@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "oranje rood",
+  "version": "1.0.3",
+  "description": "Een donker Firefox thema met vlammen-achtergrond en oranje tekst.",
+
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "{a262f1dd-0ff4-4a01-96aa-a91dbfed830b}"
+    }
+  },
+
+  "theme": {
+    "images": {
+      "theme_frame": "header.jpg"
+    },
+    "colors": {
+      "frame": "#000000",
+      "tab_background_text": "#FFB380",
+      "tab_selected": "rgba(0, 0, 0, 0.4)",
+      "tab_text": "#FFC299",
+      "tab_line": "#FF5500",
+      "toolbar": "rgba(0, 0, 0, 0.25)",
+      "toolbar_text": "#FFC299",
+      "toolbar_field": "rgba(0, 0, 0, 0.45)",
+      "toolbar_field_text": "#FFC299",
+      "toolbar_field_border": "rgba(255, 85, 0, 0.3)",
+      "toolbar_field_focus": "rgba(0, 0, 0, 0.75)",
+      "toolbar_field_text_focus": "#FFFFFF",
+      "popup": "#1C1C1E",
+      "popup_text": "#FFC299",
+      "popup_border": "#FF5500"
+    },
+    "properties": {
+      "color_scheme": "dark"
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Arcade Tetris",
+  "version": "1.1",
+  "description": "Play classic Tetris anytime from your browser!",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "tetris-arcade@timekiller.local",
+      "strict_min_version": "120.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    },
+    "gecko_android": {
+      "strict_min_version": "120.0"
+    }
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Play Tetris"
+  },
+  "permissions": [
+    "storage"
+  ]
+}

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Arcade Tetris</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="header">
+    <h2>🧩 Arcade Tetris</h2>
+  </div>
+
+  <div class="game-container">
+    <!-- Left Panel -->
+    <div class="sidebar">
+      <div class="panel">
+        <div class="panel-label">HOLD</div>
+        <canvas id="holdCanvas" width="60" height="60"></canvas>
+      </div>
+      <div class="panel stats">
+        <div class="stat-item">
+          <span class="stat-label">SCORE</span>
+          <span id="score">0</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">HIGH</span>
+          <span id="highScore">0</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">LVL</span>
+          <span id="level">1</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Canvas -->
+    <div class="canvas-wrapper">
+      <canvas id="tetrisCanvas" width="200" height="400"></canvas>
+      <div id="overlay" class="overlay">
+        <h3 id="overlayTitle">TETRIS</h3>
+        <p id="overlayMsg">Tik op Start</p>
+        <button id="startBtn">START</button>
+      </div>
+    </div>
+
+    <!-- Right Panel -->
+    <div class="sidebar">
+      <div class="panel">
+        <div class="panel-label">NEXT</div>
+        <canvas id="nextCanvas" width="60" height="60"></canvas>
+      </div>
+      <div class="controls">
+        <button id="pauseBtn" class="btn">PAUZE</button>
+        <button id="resetBtn" class="btn">RESET</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Touch Knoppen voor Android -->
+  <div class="touch-controls">
+    <div class="touch-row">
+      <button id="btnHold" class="t-btn">HOLD</button>
+      <button id="btnRotate" class="t-btn accent">DRAAI ↻</button>
+      <button id="btnDrop" class="t-btn warn">DROP ⏬</button>
+    </div>
+    <div class="touch-row">
+      <button id="btnLeft" class="t-btn">◀ LINKS</button>
+      <button id="btnDown" class="t-btn">▼ OMLAAG</button>
+      <button id="btnRight" class="t-btn">RECHTS ▶</button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
