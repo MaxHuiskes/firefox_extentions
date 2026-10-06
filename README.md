@@ -1,2 +1,2 @@
 # firefox_extentions
-here are my firefox extentionst and themes
+In this repo I store my self made themes and extentions for firefox
