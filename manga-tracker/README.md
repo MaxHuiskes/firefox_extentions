@@ -1,0 +1,81 @@
+# Manga Progress Tracker
+
+A Firefox extension that detects manga titles and chapter numbers, saves reading progress, and lets you edit or remove entries from the extension popup.
+
+## How it works
+
+- `content.js` reads the manga title and chapter from the current page.
+- Progress is stored in Firefox local extension storage.
+- `popup.html` displays and edits the saved manga list.
+- The options page limits tracking to specified domains. An empty list allows all sites.
+
+Data is local to each Firefox installation; it is not currently synchronized between desktop and Android.
+
+## Test on Firefox for Android
+
+### Requirements
+
+- Firefox for Android installed on the phone
+- Android Platform Tools (`adb`) installed on the computer
+- Node.js and `web-ext` installed:
+
+```sh
+npm install --global web-ext
+```
+
+### Prepare the phone
+
+1. Enable Android **Developer options** and **USB debugging**.
+2. Connect the phone by USB.
+3. Accept the USB debugging prompt on the phone.
+4. Confirm that the device is available:
+
+```sh
+adb devices
+```
+
+The device must be listed as `device`, not `unauthorized`.
+
+### Run the extension
+
+Run the command from this extension's directory:
+
+```sh
+cd /Users/max/Desktop/firefox_extentions/manga-tracker
+web-ext lint
+web-ext run --target=firefox-android --android-device={device id}
+```
+
+Alternatively, run it from the parent directory:
+
+```sh
+web-ext run --source-dir ./manga-tracker --target=firefox-android --android-device={device id}
+```
+
+Keep the command running while testing. This is a temporary development installation and Firefox removes it when the debugging session ends.
+
+The previous `InvalidManifest` error occurred because `web-ext` was run from `/Users/max/Desktop/firefox_extentions`, while `manifest.json` is inside the `manga-tracker` directory.
+
+## Create an Android install package
+
+Validate and build the extension:
+
+```sh
+cd /Users/max/Desktop/firefox_extentions/manga-tracker
+web-ext lint
+web-ext build
+```
+
+The package is written to `web-ext-artifacts/`. Firefox release versions require an extension signed by Mozilla. Submit the package through [Firefox Add-ons Developer Hub](https://addons.mozilla.org/developers/) as either:
+
+- **Listed**: published publicly on Firefox Add-ons.
+- **Unlisted**: signed by Mozilla for private distribution.
+
+After Mozilla signs it, install the signed add-on on Android. An unsigned package is only suitable for temporary debugging with `web-ext run`.
+
+## Usage
+
+1. Open the extension settings and optionally enter allowed domains separated by commas.
+2. Visit a manga chapter page.
+3. The extension detects and saves the title, chapter, and URL.
+4. Open the extension popup to view, edit, delete, or reopen saved entries.
