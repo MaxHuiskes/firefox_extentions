@@ -8,7 +8,7 @@ function truncateTitle(str, maxLength = 20) {
 
 document.addEventListener("DOMContentLoaded", async () => {
   const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-  const { mangaList = [] } = await browser.storage.local.get("mangaList");
+  const { mangaList = [] } = await browser.storage.sync.get("mangaList");
 
   if (tab && tab.url) {
     try {
@@ -31,7 +31,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 browser.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName === "local" && changes.mangaList) {
+  if (areaName === "sync" && changes.mangaList) {
     renderList(changes.mangaList.newValue || []);
   }
 });
@@ -59,7 +59,7 @@ async function saveMangaData() {
 
   if (!title || !url) return;
 
-  const { mangaList = [] } = await browser.storage.local.get("mangaList");
+  const { mangaList = [] } = await browser.storage.sync.get("mangaList");
   const newEntry = { title, url, chapter, updatedAt: Date.now() };
 
   if (editingIndex >= 0) {
@@ -73,16 +73,19 @@ async function saveMangaData() {
     }
   }
 
-  await browser.storage.local.set({ mangaList });
+  await browser.storage.sync.set({ mangaList });
   renderList(mangaList);
 }
 
 function renderList(list) {
   const ul = document.getElementById("manga-list");
-  ul.innerHTML = "";
+  ul.textContent = "";
 
   if (list.length === 0) {
-    ul.innerHTML = '<li class="empty-msg">Nog geen manga opgeslagen.</li>';
+    const emptyLi = document.createElement("li");
+    emptyLi.className = "empty-msg";
+    emptyLi.textContent = "Nog geen manga opgeslagen.";
+    ul.appendChild(emptyLi);
     return;
   }
 
@@ -91,9 +94,18 @@ function renderList(list) {
 
     const info = document.createElement("div");
     info.className = "info";
-    
-    const shortTitle = truncateTitle(item.title, 20);
-    info.innerHTML = `<a href="${item.url}" target="_blank" title="${item.title}"><strong>${shortTitle}</strong></a> - Ch. ${item.chapter || "N/A"}`;
+
+    const link = document.createElement("a");
+    link.href = item.url;
+    link.target = "_blank";
+    link.title = item.title;
+
+    const strong = document.createElement("strong");
+    strong.textContent = truncateTitle(item.title, 20);
+    link.appendChild(strong);
+
+    info.appendChild(link);
+    info.appendChild(document.createTextNode(` - Ch. ${item.chapter || "N/A"}`));
 
     const actions = document.createElement("div");
     actions.className = "actions";
@@ -116,7 +128,7 @@ function renderList(list) {
     delBtn.title = "Verwijderen";
     delBtn.onclick = async () => {
       list.splice(index, 1);
-      await browser.storage.local.set({ mangaList: list });
+      await browser.storage.sync.set({ mangaList: list });
       renderList(list);
     };
 
