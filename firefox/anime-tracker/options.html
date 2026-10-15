@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 20px;
+      max-width: 450px;
+      color: #202124;
+    }
+    h2 {
+      margin-top: 0;
+      font-size: 18px;
+    }
+    p {
+      font-size: 13px;
+      color: #5f6368;
+    }
+    textarea {
+      width: 100%;
+      height: 100px;
+      box-sizing: border-box;
+      margin-top: 8px;
+      padding: 8px;
+      border: 1px solid #dadce0;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 13px;
+    }
+    button {
+      margin-top: 12px;
+      cursor: pointer;
+      padding: 8px 16px;
+      background: #0060df;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+    button:hover {
+      background: #003eaa;
+    }
+    .status {
+      color: #137333;
+      font-weight: bold;
+      font-size: 13px;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Anime Tracker Settings</h2>
+  <p>Enter the domains of the sites you watch on (comma-separated). Leave blank to allow tracking on all websites.</p>
+  
+  <textarea id="sites" placeholder="crunchyroll.com, hianime.to, aniwatch.to"></textarea>
+  <br>
+  <button id="save">Save Settings</button>
+  <div id="status" class="status"></div>
+
+  <script src="options.js"></script>
+</body>
+</html>

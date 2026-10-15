@@ -5,11 +5,15 @@ A Firefox extension that detects manga titles and chapter numbers, saves reading
 ## How it works
 
 - `content.js` reads the manga title and chapter from the current page.
-- Progress is stored in Firefox local extension storage.
+- Progress is stored in `browser.storage.sync` (with a local mirror).
 - `popup.html` displays and edits the saved manga list.
 - The options page limits tracking to specified domains. An empty list allows all sites.
 
-Data is local to each Firefox installation; it is not currently synchronized between desktop and Android.
+Desktop ↔ desktop sync works via `browser.storage.sync` (same Firefox Account, Add-ons sync enabled, signed add-on).
+
+**Desktop ↔ Android does not.** Firefox for Android exposes `storage.sync` but does not upload/download it through Mozilla accounts ([MDN](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/storage/sync), [bug 1625257](https://bugzilla.mozilla.org/show_bug.cgi?id=1625257)). AMO approval does not change this.
+
+Use **Settings → Export / Import** (copy JSON or download a file) to move progress between desktop and Android. Vote on [bug 1625257](https://bugzilla.mozilla.org/show_bug.cgi?id=1625257) for automatic mobile sync.
 
 ## Test on Firefox for Android
 

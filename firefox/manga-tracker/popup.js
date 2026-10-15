@@ -8,11 +8,13 @@ function truncateTitle(str, maxLength = 20) {
 
 document.addEventListener("DOMContentLoaded", async () => {
   const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-  const { mangaList = [] } = await browser.storage.sync.get("mangaList");
+  const { mangaList = [] } = await getTrackerStorage();
 
   if (tab && tab.url) {
     try {
-      const response = await browser.tabs.sendMessage(tab.id, { action: "getMangaDetails" });
+      const response = await browser.tabs.sendMessage(tab.id, {
+        action: "getMangaDetails",
+      });
       if (response && response.title) {
         document.getElementById("title").value = response.title;
         document.getElementById("url").value = response.url;
@@ -25,13 +27,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   renderList(mangaList);
 
-  ["title", "url", "chapter"].forEach(id => {
+  ["title", "url", "chapter"].forEach((id) => {
     document.getElementById(id).addEventListener("input", triggerAutoSave);
   });
 });
 
 browser.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName === "sync" && changes.mangaList) {
+  if (
+    (areaName === "sync" || areaName === "local") &&
+    changes.mangaList
+  ) {
     renderList(changes.mangaList.newValue || []);
   }
 });
@@ -48,7 +53,9 @@ function triggerAutoSave() {
   saveTimeout = setTimeout(async () => {
     await saveMangaData();
     statusEl.textContent = "✓ Automatisch opgeslagen";
-    setTimeout(() => { statusEl.textContent = ""; }, 2000);
+    setTimeout(() => {
+      statusEl.textContent = "";
+    }, 2000);
   }, 500);
 }
 
@@ -59,13 +66,15 @@ async function saveMangaData() {
 
   if (!title || !url) return;
 
-  const { mangaList = [] } = await browser.storage.sync.get("mangaList");
+  const { mangaList = [] } = await getTrackerStorage();
   const newEntry = { title, url, chapter, updatedAt: Date.now() };
 
   if (editingIndex >= 0) {
     mangaList[editingIndex] = newEntry;
   } else {
-    const existingIndex = mangaList.findIndex(i => i.title.toLowerCase() === title.toLowerCase());
+    const existingIndex = mangaList.findIndex(
+      (i) => i.title.toLowerCase() === title.toLowerCase()
+    );
     if (existingIndex >= 0) {
       mangaList[existingIndex] = newEntry;
     } else {
@@ -73,7 +82,7 @@ async function saveMangaData() {
     }
   }
 
-  await browser.storage.sync.set({ mangaList });
+  await setTrackerStorage({ mangaList });
   renderList(mangaList);
 }
 
@@ -105,7 +114,9 @@ function renderList(list) {
     link.appendChild(strong);
 
     info.appendChild(link);
-    info.appendChild(document.createTextNode(` - Ch. ${item.chapter || "N/A"}`));
+    info.appendChild(
+      document.createTextNode(` - Ch. ${item.chapter || "N/A"}`)
+    );
 
     const actions = document.createElement("div");
     actions.className = "actions";
@@ -128,7 +139,7 @@ function renderList(list) {
     delBtn.title = "Verwijderen";
     delBtn.onclick = async () => {
       list.splice(index, 1);
-      await browser.storage.sync.set({ mangaList: list });
+      await setTrackerStorage({ mangaList: list });
       renderList(list);
     };
 

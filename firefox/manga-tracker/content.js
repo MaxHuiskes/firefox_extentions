@@ -7,40 +7,122 @@ function normalizeString(str) {
 
 function extractChapterInfo() {
   const url = window.location.href;
-  const urlMatch = url.match(/chapter-(\d+(?:[-\.]\d+)?)/i);
+  const urlMatch = url.match(/chapter-(\d+(?:[-\.]\d+)*)/i);
   if (urlMatch) {
-    return urlMatch[1].replace('-', '.');
+    return urlMatch[1].replace(/-/g, ".");
   }
 
-  const currentChapterEl = document.querySelector('.current-chapter') || document.querySelector('h1.current-chapter');
+  const currentChapterEl =
+    document.querySelector(".current-chapter") ||
+    document.querySelector("h1.current-chapter") ||
+    document.querySelector("h1");
   if (currentChapterEl) {
-    const match = currentChapterEl.textContent.match(/(?:chapter|ch\.?)\s*(\d+(?:\.\d+)?)/i);
-    if (match) return match[1];
+    const match = currentChapterEl.textContent.match(
+      /(?:chapter|ch\.?)\s*(\d+(?:[-\.]\d+)*)/i
+    );
+    if (match) return match[1].replace(/-/g, ".");
   }
 
   return "";
 }
 
-function extractMangaTitle() {
-  const breadcrumbs = document.querySelectorAll('.breadcrumb span[itemprop="name"], .breadcrumbs span[itemprop="name"]');
-  if (breadcrumbs.length >= 2) {
-    return breadcrumbs[1].textContent.trim();
-  }
-
-  const currentChapterEl = document.querySelector('.current-chapter') || document.querySelector('h1.current-chapter');
-  if (currentChapterEl && currentChapterEl.textContent.includes(':')) {
-    return currentChapterEl.textContent.split(':')[0].trim();
-  }
-
-  const metaTitle = document.querySelector('meta[property="og:title"]')?.content || document.title;
-  return metaTitle
-    .replace(/^Read /i, "")
-    .replace(/ - MangaKakalot.*/i, "")
-    .replace(/ - Read .*/i, "")
-    .replace(/Chapter \d+.*/i, "")
-    .replace(/Ch\.\s*\d+.*/i, "")
-    .replace(/\|.*/, "")
+function titleFromMangaUrl() {
+  const match = window.location.pathname.match(/\/manga\/([^/]+)/i);
+  if (!match) return "";
+  return decodeURIComponent(match[1])
+    .replace(/[-_]+/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase())
     .trim();
+}
+
+function isGenericTitle(title) {
+  const n = normalizeString(title);
+  const blocked = new Set([
+    "onlinemanga",
+    "mangaonline",
+    "readmanga",
+    "readmangaonline",
+    "home",
+    "manga",
+    "mangas",
+    "comics",
+    "webtoon",
+    "mangakakalot",
+    "chapter",
+    "free",
+    "freeonline",
+  ]);
+  return !n || blocked.has(n) || /^chapter\d*$/i.test(n);
+}
+
+function cleanTitleCandidate(raw) {
+  if (!raw) return "";
+  let title = String(raw).trim();
+
+  const readChapter = title.match(
+    /^Read\s+(.+?)\s+Chapter\s+\d+(?:[.-]\d+)*/i
+  );
+  if (readChapter) {
+    title = readChapter[1].trim();
+  } else {
+    title = title
+      .replace(/^Read\s+/i, "")
+      .replace(/\s*\|.*$/, "")
+      .replace(/\s*-\s*MangaKakalot.*$/i, "")
+      .replace(/\s*-\s*Read\s+.*$/i, "")
+      .replace(/\s*-\s*Chapter\s+\d+(?:[.-]\d+)*\b.*$/i, "")
+      .replace(/\s+Chapter\s+\d+(?:[.-]\d+)*\b.*$/i, "")
+      .replace(/\s+Ch\.\s*\d+(?:[.-]\d+)*\b.*$/i, "")
+      .replace(/^Chapter\s+\d+(?:[.-]\d+)*\s*[:-]\s*/i, "")
+      .replace(/\s+Free\s+Online.*$/i, "")
+      .trim();
+  }
+
+  if (isGenericTitle(title)) return "";
+  return title;
+}
+
+function titleFromHeading() {
+  const heading =
+    document.querySelector(".current-chapter") ||
+    document.querySelector("h1.current-chapter") ||
+    document.querySelector("h1");
+  if (!heading) return "";
+
+  const text = heading.textContent.trim();
+  const withChapter = text.match(/^(.+?)\s+Chapter\s+\d+(?:[.-]\d+)*/i);
+  if (withChapter) {
+    const title = withChapter[1].trim();
+    return isGenericTitle(title) ? "" : title;
+  }
+
+  if (text.includes(":")) {
+    return cleanTitleCandidate(text.split(":")[0]);
+  }
+
+  return cleanTitleCandidate(text);
+}
+
+function extractMangaTitle() {
+  const fromHeading = titleFromHeading();
+  if (fromHeading) return fromHeading;
+
+  const fromDoc = cleanTitleCandidate(document.title);
+  if (fromDoc) return fromDoc;
+
+  const ogTitle = document.querySelector('meta[property="og:title"]')?.content;
+  const fromOg = cleanTitleCandidate(ogTitle);
+  if (fromOg) return fromOg;
+
+  const breadcrumbs = document.querySelectorAll(
+    '.breadcrumb span[itemprop="name"], .breadcrumbs span[itemprop="name"], .breadcrumb a, .breadcrumbs a'
+  );
+  for (let i = breadcrumbs.length - 1; i >= 0; i--) {
+    const fromCrumb = cleanTitleCandidate(breadcrumbs[i].textContent);
+    if (fromCrumb && !isGenericTitle(fromCrumb)) return fromCrumb;
+  }
+
+  return titleFromMangaUrl();
 }
 
 function showPageNotification(message) {
@@ -74,45 +156,71 @@ function showPageNotification(message) {
 }
 
 async function autoUpdateProgress() {
-  const hostname = window.location.hostname;
-  
-  // Gebruik storage.local in plaats van storage.sync voor directe betrouwbaarheid
-  const storage = await browser.storage.local.get(["allowedSites", "mangaList"]);
-  const allowedSites = storage.allowedSites || [];
-  const mangaList = storage.mangaList || [];
+  try {
+    const hostname = window.location.hostname;
+    const storage = await getTrackerStorage();
+    const allowedSites = storage.allowedSites || [];
+    const mangaList = storage.mangaList || [];
 
-  const isAllowed = allowedSites.length === 0 || allowedSites.some(site => site && hostname.includes(site.trim()));
-  if (!isAllowed) return;
+    const isAllowed =
+      allowedSites.length === 0 ||
+      allowedSites.some((site) => site && hostname.includes(site.trim()));
+    if (!isAllowed) {
+      console.log(
+        `[Manga Tracker] Skip: site not allowed (${hostname}). Allowed: ${allowedSites.join(", ")}`
+      );
+      return;
+    }
 
-  const chapter = extractChapterInfo();
-  const title = extractMangaTitle();
-  const url = window.location.href;
+    const chapter = extractChapterInfo();
+    const title = extractMangaTitle();
+    const url = window.location.href;
 
-  if (!title || !chapter) return;
+    if (!title || !chapter) {
+      console.log(
+        `[Manga Tracker] Skip: missing title/chapter (title="${title}", chapter="${chapter}")`
+      );
+      return;
+    }
 
-  const cleanCurrentTitle = normalizeString(title);
+    const cleanCurrentTitle = normalizeString(title);
 
-  const existingIndex = mangaList.findIndex(item => {
-    const cleanSavedTitle = normalizeString(item.title);
-    return cleanSavedTitle === cleanCurrentTitle ||
-           (cleanSavedTitle.length > 5 && cleanCurrentTitle.includes(cleanSavedTitle)) ||
-           (cleanCurrentTitle.length > 5 && cleanSavedTitle.includes(cleanCurrentTitle));
-  });
+    const existingIndex = mangaList.findIndex((item) => {
+      const cleanSavedTitle = normalizeString(item.title);
+      return (
+        cleanSavedTitle === cleanCurrentTitle ||
+        (cleanSavedTitle.length > 5 &&
+          cleanCurrentTitle.includes(cleanSavedTitle)) ||
+        (cleanCurrentTitle.length > 5 &&
+          cleanSavedTitle.includes(cleanCurrentTitle))
+      );
+    });
 
-  const newEntry = { title, url, chapter, updatedAt: Date.now() };
+    const newEntry = { title, url, chapter, updatedAt: Date.now() };
 
-  if (existingIndex >= 0) {
-    if (mangaList[existingIndex].chapter === chapter && mangaList[existingIndex].url === url) return;
+    if (existingIndex >= 0) {
+      if (
+        mangaList[existingIndex].chapter === chapter &&
+        mangaList[existingIndex].url === url
+      ) {
+        console.log(
+          `[Manga Tracker] Already saved: ${title} Ch. ${chapter}`
+        );
+        return;
+      }
 
-    mangaList[existingIndex] = { ...mangaList[existingIndex], ...newEntry };
-    await browser.storage.local.set({ mangaList });
-    console.log(`[Manga Tracker] Auto-opgeslagen: ${title} Ch. ${chapter}`);
-    showPageNotification(`✓ Voortgang opgeslagen: Ch. ${chapter}`);
-  } else {
-    mangaList.unshift(newEntry);
-    await browser.storage.local.set({ mangaList });
-    console.log(`[Manga Tracker] Auto-toegevoegd: ${title} Ch. ${chapter}`);
-    showPageNotification(`✓ Manga toegevoegd: Ch. ${chapter}`);
+      mangaList[existingIndex] = { ...mangaList[existingIndex], ...newEntry };
+      await setTrackerStorage({ mangaList });
+      console.log(`[Manga Tracker] Auto-opgeslagen: ${title} Ch. ${chapter}`);
+      showPageNotification(`✓ Voortgang opgeslagen: Ch. ${chapter}`);
+    } else {
+      mangaList.unshift(newEntry);
+      await setTrackerStorage({ mangaList });
+      console.log(`[Manga Tracker] Auto-toegevoegd: ${title} Ch. ${chapter}`);
+      showPageNotification(`✓ Manga toegevoegd: Ch. ${chapter}`);
+    }
+  } catch (err) {
+    console.error("[Manga Tracker] Auto-update failed:", err);
   }
 }
 
@@ -140,7 +248,7 @@ browser.runtime.onMessage.addListener((request) => {
     return Promise.resolve({
       title: extractMangaTitle(),
       chapter: extractChapterInfo(),
-      url: window.location.href
+      url: window.location.href,
     });
   }
 });
