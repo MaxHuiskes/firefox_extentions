@@ -4,12 +4,13 @@ Self-made browser themes and extensions for **Firefox** and **Brave**.
 
 ## Contents
 
-| Path | Type | Browsers | Description |
-|------|------|----------|-------------|
-| [`manga-tracker/`](manga-tracker/) | Extension | Firefox, Brave | Tracks manga title/chapter on page visit; edit or remove entries from the popup. See [manga-tracker/README.md](manga-tracker/README.md). |
-| [`time_killer/tetris arcade/`](time_killer/tetris%20arcade/) | Extension | Firefox, Brave | Arcade Tetris playable from the browser action popup. |
-| [`oranje rood/`](oranje%20rood/) | Theme | Firefox | Dark theme with flame header and orange text. |
-| [`releases/`](releases/) | Packages | — | Built/signed release zips (e.g. manga-tracker V1.0.0). |
+| Path | Type | Browser | Description |
+|------|------|---------|-------------|
+| [`firefox/manga-tracker/`](firefox/manga-tracker/) | Extension | Firefox | Tracks manga title/chapter; edit/remove from popup. |
+| [`brave/manga-tracker/`](brave/manga-tracker/) | Extension | Brave | Same feature set, Chromium MV3 / `chrome.*` APIs. |
+| [`firefox/time_killer/tetris arcade/`](firefox/time_killer/tetris%20arcade/) | Extension | Firefox | Arcade Tetris from the browser action popup. |
+| [`firefox/oranje rood/`](firefox/oranje%20rood/) | Theme | Firefox | Dark theme with flame header and orange text. |
+| [`firefox/releases/`](firefox/releases/) | Packages | Firefox | Built/signed release zips. |
 
 ## Load temporarily
 
@@ -24,12 +25,11 @@ Self-made browser themes and extensions for **Firefox** and **Brave**.
 1. Open `brave://extensions`
 2. Enable **Developer mode**
 3. Click **Load unpacked**
-4. Select the extension folder (the one that contains `manifest.json`)
+4. Select the extension folder (e.g. `brave/manga-tracker`)
 
-Firefox themes (`theme` in `manifest.json`) do not load in Brave. Use Chromium/Brave theme packs separately if needed.
+Firefox themes (`theme` in `manifest.json`) do not load in Brave.
 
 ## Notes
 
 - Spelling in the repo name is intentional (`extentions`).
-- Manga tracker data is local per browser install (not synced).
-- Brave uses Chromium Manifest V3; Firefox-specific `browser_specific_settings.gecko` is ignored there.
+- Manga tracker data is local per browser/profile; Firefox and Brave stores are separate.
