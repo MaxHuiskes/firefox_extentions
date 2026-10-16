@@ -1,8 +1,13 @@
 {
   "manifest_version": 3,
   "name": "Manga Progress Tracker",
-  "version": "1.0.5",
-  "description": "Track manga reading progress. Export/import to move data between desktop and Android.",
+  "version": "1.1.0",
+  "icons": {
+    "16": "images/icon.png",
+    "48": "images/icon.png",
+    "128": "images/icon.png"
+  },
+  "description": "Track manga progress. Manual GitHub Gist sync or export/import between desktop and Android.",
   "permissions": [
     "storage",
     "activeTab",
@@ -10,22 +15,24 @@
     "scripting"
   ],
   "host_permissions": [
-    "<all_urls>"
+    "<all_urls>",
+    "https://api.github.com/*"
   ],
   "background": {
-    "scripts": ["storage.js", "background.js"]
+    "scripts": ["js/storage.js", "js/gist.js", "js/background.js"]
   },
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "html/popup.html",
+    "default_icon": "images/icon.png"
   },
   "options_ui": {
-    "page": "options.html",
+    "page": "html/options.html",
     "open_in_tab": true
   },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["storage.js", "content.js"],
+      "js": ["js/storage.js", "js/content.js"],
       "run_at": "document_idle"
     }
   ],
@@ -33,7 +40,7 @@
     "gecko": {
       "id": "manga-tracker-sync@yourdomain.com",
       "data_collection_permissions": {
-        "required": ["none"]
+        "required": ["authenticationInfo"]
       }
     }
   }

@@ -4,7 +4,7 @@ function setStatus(el, message, isError = false) {
   if (message) {
     setTimeout(() => {
       if (el.textContent === message) el.textContent = "";
-    }, 3500);
+    }, 5000);
   }
 }
 
@@ -45,33 +45,56 @@ function parseImportPayload(raw) {
   };
 }
 
-function mergeMangaLists(current = [], incoming = []) {
-  const byKey = new Map();
+async function refreshGistUi() {
+  const { token, gistId } = await getGistSettings();
+  document.getElementById("gist-token").value = token;
+  document.getElementById("gist-id").value = gistId;
 
-  for (const item of [...current, ...incoming]) {
-    if (!item || !item.title) continue;
-    const key = String(item.title)
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, "");
-    const prev = byKey.get(key);
-    if (!prev || (item.updatedAt || 0) >= (prev.updatedAt || 0)) {
-      byKey.set(key, {
-        title: String(item.title).trim(),
-        url: item.url || "",
-        chapter: item.chapter != null ? String(item.chapter) : "",
-        updatedAt: item.updatedAt || Date.now(),
-      });
-    }
+  const display = document.getElementById("gist-id-display");
+  if (gistId) {
+    display.hidden = false;
+    display.innerHTML = `Gist ID: <span class="mono">${gistId}</span><br>URL: <a href="https://gist.github.com/${gistId}" target="_blank" rel="noopener">https://gist.github.com/${gistId}</a>`;
+  } else {
+    display.hidden = true;
+    display.textContent = "";
   }
 
-  return Array.from(byKey.values()).sort(
-    (a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)
-  );
+  document.getElementById("gist-sync").disabled = !token;
+
+  const last = document.getElementById("gist-last-sync");
+  try {
+    const status = await browser.runtime.sendMessage({
+      action: "getGistSyncStatus",
+    });
+    const parts = [];
+    if (status && status.gistRateLimitedUntil > Date.now()) {
+      parts.push(
+        `Rate limited until ${new Date(status.gistRateLimitedUntil).toLocaleString()}. Avoid Force sync until then.`
+      );
+    }
+    if (status && status.lastGistSyncAt) {
+      const when = new Date(status.lastGistSyncAt).toLocaleString();
+      parts.push(
+        status.lastGistSyncError
+          ? `Last sync failed (${when}): ${status.lastGistSyncError}`
+          : `Last sync ok (${when}), mode: ${status.lastGistSyncMode || "?"}`
+      );
+    }
+    if (parts.length) {
+      last.hidden = false;
+      last.textContent = parts.join(" ");
+    } else {
+      last.hidden = true;
+    }
+  } catch (_e) {
+    last.hidden = true;
+  }
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
   const { allowedSites = [] } = await getTrackerStorage();
   document.getElementById("sites").value = allowedSites.join(", ");
+  await refreshGistUi();
 });
 
 document.getElementById("save").addEventListener("click", async () => {
@@ -83,6 +106,62 @@ document.getElementById("save").addEventListener("click", async () => {
 
   await setTrackerStorage({ allowedSites });
   setStatus(document.getElementById("status"), "Settings saved successfully!");
+});
+
+document.getElementById("gist-save").addEventListener("click", async () => {
+  const token = document.getElementById("gist-token").value.trim();
+  const gistId = document.getElementById("gist-id").value.trim();
+  await saveGistSettings({ token, gistId });
+  await refreshGistUi();
+  setStatus(
+    document.getElementById("gist-status"),
+    token ? "Token / Gist ID saved." : "Cleared token."
+  );
+});
+
+document.getElementById("gist-sync").addEventListener("click", async () => {
+  const gistStatus = document.getElementById("gist-status");
+  const btn = document.getElementById("gist-sync");
+  try {
+    const token = document.getElementById("gist-token").value.trim();
+    const gistId = document.getElementById("gist-id").value.trim();
+    await saveGistSettings({ token, gistId });
+
+    btn.disabled = true;
+    gistStatus.textContent = "Syncing: pull → push…";
+    const result = await browser.runtime.sendMessage({
+      action: "forceGistSync",
+    });
+
+    if (result && result.gistId) {
+      document.getElementById("gist-id").value = result.gistId;
+    }
+    await refreshGistUi();
+
+    const { allowedSites = [] } = await getTrackerStorage();
+    document.getElementById("sites").value = allowedSites.join(", ");
+
+    if (result && result.error) {
+      setStatus(gistStatus, `Sync failed: ${result.error}`, true);
+    } else {
+      setStatus(
+        gistStatus,
+        `Synced (pull → push). ${result.mangaCount || 0} manga.`
+      );
+    }
+  } catch (err) {
+    setStatus(gistStatus, err.message || String(err), true);
+  } finally {
+    btn.disabled = !document.getElementById("gist-token").value.trim();
+  }
+});
+
+document.getElementById("gist-clear").addEventListener("click", async () => {
+  await clearGistSettings();
+  document.getElementById("gist-token").value = "";
+  document.getElementById("gist-id").value = "";
+  await refreshGistUi();
+  setStatus(document.getElementById("gist-status"), "GitHub sync cleared.");
 });
 
 document.getElementById("export-btn").addEventListener("click", async () => {
@@ -97,7 +176,7 @@ document.getElementById("export-btn").addEventListener("click", async () => {
     );
     setStatus(
       transferStatus,
-      `Exported ${mangaList.length} manga. Copy or download, then import on the other device.`
+      `Exported ${mangaList.length} manga.`
     );
   } catch (err) {
     setStatus(transferStatus, `Export failed: ${err.message}`, true);
@@ -151,14 +230,11 @@ async function importFromText(raw) {
 
   const next = {};
   if (parsed.hasMangaList) {
-    next.mangaList = mergeMangaLists(current.mangaList || [], parsed.mangaList);
+    next.mangaList = parsed.mangaList;
   }
   if (parsed.hasAllowedSites) {
-    const mergedSites = Array.from(
-      new Set([...(current.allowedSites || []), ...parsed.allowedSites])
-    );
-    next.allowedSites = mergedSites;
-    document.getElementById("sites").value = mergedSites.join(", ");
+    next.allowedSites = parsed.allowedSites;
+    document.getElementById("sites").value = parsed.allowedSites.join(", ");
   }
 
   await setTrackerStorage(next);

@@ -13,7 +13,21 @@ Desktop ↔ desktop sync works via `browser.storage.sync` (same Firefox Account,
 
 **Desktop ↔ Android does not.** Firefox for Android exposes `storage.sync` but does not upload/download it through Mozilla accounts ([MDN](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/storage/sync), [bug 1625257](https://bugzilla.mozilla.org/show_bug.cgi?id=1625257)). AMO approval does not change this.
 
-Use **Settings → Export / Import** (copy JSON or download a file) to move progress between desktop and Android. Vote on [bug 1625257](https://bugzilla.mozilla.org/show_bug.cgi?id=1625257) for automatic mobile sync.
+Use **Settings → GitHub Gist sync** (each user uses their own token) or **Export / Import**. Vote on [bug 1625257](https://bugzilla.mozilla.org/show_bug.cgi?id=1625257) for built-in Firefox mobile sync.
+
+## GitHub Gist sync (recommended)
+
+No Google Cloud / OAuth. Each user needs a free GitHub account.
+
+1. Open [github.com/settings/tokens](https://github.com/settings/tokens)
+2. **Generate new token (classic)** → enable only **gist** → Generate
+3. Extension **Settings** → paste token → **Save token / Gist ID** → **Sync now**
+4. Copy the shown **Gist ID**
+5. On the other device: paste the **same token** and **same Gist ID** → **Sync now**
+
+Creates a **secret** gist (`manga-tracker-backup.json`). Free. Works on desktop and Android.
+
+Gist sync is **manual only**: use **Settings → Sync now (pull → push)** on each device when you want to exchange progress.
 
 ## Test on Firefox for Android
 
@@ -45,27 +59,19 @@ The device must be listed as `device`, not `unauthorized`.
 Run the command from this extension's directory:
 
 ```sh
-cd /Users/max/Desktop/firefox_extentions/manga-tracker
+cd /Users/max/Desktop/firefox_extentions/firefox/manga-tracker
 web-ext lint
 web-ext run --target=firefox-android --android-device={device id}
 ```
 
-Alternatively, run it from the parent directory:
-
-```sh
-web-ext run --source-dir ./manga-tracker --target=firefox-android --android-device={device id}
-```
-
 Keep the command running while testing. This is a temporary development installation and Firefox removes it when the debugging session ends.
-
-The previous `InvalidManifest` error occurred because `web-ext` was run from `/Users/max/Desktop/firefox_extentions`, while `manifest.json` is inside the `manga-tracker` directory.
 
 ## Create an Android install package
 
 Validate and build the extension:
 
 ```sh
-cd /Users/max/Desktop/firefox_extentions/manga-tracker
+cd /Users/max/Desktop/firefox_extentions/firefox/manga-tracker
 web-ext lint
 web-ext build
 ```

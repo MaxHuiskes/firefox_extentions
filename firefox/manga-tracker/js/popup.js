@@ -33,16 +33,51 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 browser.storage.onChanged.addListener((changes, areaName) => {
-  if (
-    (areaName === "sync" || areaName === "local") &&
-    changes.mangaList
-  ) {
+  // Prefer local — sync mirrors can briefly lag and resurrect deletes.
+  if (areaName === "local" && changes.mangaList) {
     renderList(changes.mangaList.newValue || []);
   }
 });
 
 document.getElementById("open-options-btn").addEventListener("click", () => {
   browser.runtime.openOptionsPage();
+});
+
+document.getElementById("gist-sync-btn").addEventListener("click", async () => {
+  const btn = document.getElementById("gist-sync-btn");
+  const statusEl = document.getElementById("status");
+  btn.disabled = true;
+  statusEl.classList.remove("err");
+  statusEl.textContent = "Syncing…";
+
+  try {
+    const result = await browser.runtime.sendMessage({
+      action: "forceGistSync",
+    });
+    const { mangaList = [] } = await getTrackerStorage();
+    renderList(mangaList);
+
+    if (result && result.error) {
+      statusEl.classList.add("err");
+      statusEl.textContent = result.error;
+    } else if (result && result.skipped && result.reason) {
+      statusEl.classList.add("err");
+      statusEl.textContent =
+        result.reason === "missing token or gist id"
+          ? "Set token + Gist ID in Opties"
+          : "Sync skipped";
+    } else {
+      statusEl.textContent = `✓ Synced (${result.mangaCount || mangaList.length})`;
+      setTimeout(() => {
+        if (statusEl.textContent.startsWith("✓ Synced")) statusEl.textContent = "";
+      }, 2000);
+    }
+  } catch (err) {
+    statusEl.classList.add("err");
+    statusEl.textContent = err.message || String(err);
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 function triggerAutoSave() {
@@ -110,7 +145,8 @@ function renderList(list) {
     link.title = item.title;
 
     const strong = document.createElement("strong");
-    strong.textContent = truncateTitle(item.title, 20);
+    const maxLen = window.matchMedia("(max-width: 480px)").matches ? 48 : 22;
+    strong.textContent = truncateTitle(item.title, maxLen);
     link.appendChild(strong);
 
     info.appendChild(link);

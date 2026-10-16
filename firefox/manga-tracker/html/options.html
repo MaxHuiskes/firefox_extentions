@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <style>
+    :root {
+      --pad: 20px;
+      --text: #202124;
+      --muted: #5f6368;
+      --border: #dadce0;
+      --primary: #0060df;
+      --primary-hover: #003eaa;
+      --tap: 48px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: var(--pad);
+      padding-bottom: max(var(--pad), env(safe-area-inset-bottom));
+      max-width: 520px;
+      margin: 0 auto;
+      color: var(--text);
+      background: #fff;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    h2 {
+      margin: 0 0 8px;
+      font-size: 22px;
+      line-height: 1.25;
+    }
+
+    h3 {
+      margin: 28px 0 10px;
+      font-size: 17px;
+      line-height: 1.3;
+    }
+
+    p {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.5;
+      margin: 0 0 10px;
+    }
+
+    input[type="text"],
+    input[type="password"] {
+      width: 100%;
+      margin-top: 8px;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 16px;
+      min-height: var(--tap);
+      background: #fff;
+    }
+
+    textarea {
+      width: 100%;
+      margin-top: 8px;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    #sites {
+      height: 100px;
+      font-family: inherit;
+      font-size: 16px;
+    }
+
+    #transfer-data {
+      height: 180px;
+    }
+
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    button, .file-btn {
+      cursor: pointer;
+      padding: 12px 16px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 15px;
+      min-height: var(--tap);
+    }
+
+    button:hover, .file-btn:hover {
+      background: var(--primary-hover);
+    }
+
+    button.secondary, .file-btn.secondary {
+      background: #e0e0e0;
+      color: var(--text);
+    }
+
+    button.secondary:hover, .file-btn.secondary:hover {
+      background: #d0d0d0;
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .file-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .file-btn input {
+      display: none;
+    }
+
+    .status {
+      font-weight: 600;
+      font-size: 14px;
+      margin-top: 10px;
+      min-height: 20px;
+      line-height: 1.35;
+      word-break: break-word;
+    }
+
+    .status.ok { color: #137333; }
+    .status.err { color: #c5221f; }
+
+    .note {
+      margin-top: 12px;
+      padding: 12px 14px;
+      background: #f1f3f4;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #3c4043;
+      line-height: 1.5;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+
+    .note a {
+      color: var(--primary);
+    }
+
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+    }
+
+    ol.setup {
+      margin: 8px 0 0;
+      padding-left: 20px;
+      font-size: 13px;
+      color: #3c4043;
+      line-height: 1.55;
+    }
+
+    hr {
+      border: none;
+      border-top: 1px solid #e0e0e0;
+      margin: 28px 0;
+    }
+
+    @media (max-width: 480px) {
+      body {
+        padding: 16px;
+        max-width: none;
+      }
+
+      h2 {
+        font-size: 24px;
+      }
+
+      h3 {
+        font-size: 18px;
+      }
+
+      p {
+        font-size: 15px;
+      }
+
+      .btn-row {
+        flex-direction: column;
+      }
+
+      .btn-row button,
+      .btn-row .file-btn {
+        width: 100%;
+      }
+
+      #transfer-data {
+        height: 220px;
+      }
+
+      .note,
+      ol.setup {
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h2>Manga Tracker Settings</h2>
+
+  <h3>Allowed sites</h3>
+  <p>Domains you read on (comma-separated). Leave blank to allow all sites.</p>
+  <textarea id="sites" placeholder="mangadex.org, comick.io, mangakakalot.gg"></textarea>
+  <div class="btn-row">
+    <button id="save" type="button">Save Settings</button>
+  </div>
+  <div id="status" class="status ok"></div>
+
+  <hr>
+
+  <h3>GitHub Gist sync (manual)</h3>
+  <p>
+    Sync only when you click the button (pull → push). No auto sync on save or popup open.
+  </p>
+  <div class="note">
+    <strong>Setup (2 minutes)</strong>
+    <ol class="setup">
+      <li>Open <a href="https://github.com/settings/tokens" target="_blank" rel="noopener">github.com/settings/tokens</a></li>
+      <li><strong>Generate new token (classic)</strong></li>
+      <li>Enable only the <strong>gist</strong> scope → Generate</li>
+      <li>Paste token below → Save → <strong>Sync now</strong></li>
+      <li>On the other device: same token + same Gist ID → <strong>Sync now</strong></li>
+    </ol>
+  </div>
+  <p>GitHub token (gist scope):</p>
+  <input type="password" id="gist-token" placeholder="ghp_..." autocomplete="off">
+  <p>Gist ID (filled after first sync; copy to your other device):</p>
+  <input type="text" id="gist-id" placeholder="optional until first sync" autocomplete="off">
+  <div class="btn-row">
+    <button id="gist-save" type="button" class="secondary">Save token / Gist ID</button>
+    <button id="gist-sync" type="button">Sync now (pull → push)</button>
+    <button id="gist-clear" type="button" class="secondary">Clear</button>
+  </div>
+  <div id="gist-status" class="status ok"></div>
+  <div id="gist-id-display" class="note mono" hidden></div>
+  <div id="gist-last-sync" class="note" hidden></div>
+
+  <hr>
+
+  <h3>Export / Import</h3>
+  <p>Manual backup without GitHub.</p>
+  <textarea id="transfer-data" placeholder="Exported JSON appears here. Paste JSON here to import." spellcheck="false"></textarea>
+  <div class="btn-row">
+    <button id="export-btn" type="button">Export</button>
+    <button id="copy-btn" type="button" class="secondary">Copy</button>
+    <button id="download-btn" type="button" class="secondary">Download file</button>
+    <button id="import-btn" type="button">Import (merge)</button>
+    <label class="file-btn secondary">
+      Load file
+      <input id="import-file" type="file" accept="application/json,.json,text/plain">
+    </label>
+  </div>
+  <div id="transfer-status" class="status ok"></div>
+
+  <hr>
+
+  <h3>Request Firefox Android sync</h3>
+  <p>Mozilla still does not sync extension storage on Android:</p>
+  <div class="note">
+    Bug
+    <a href="https://bugzilla.mozilla.org/show_bug.cgi?id=1625257" target="_blank" rel="noopener">
+      1625257 – Support storage.sync on Android
+    </a>
+  </div>
+
+  <script src="../js/storage.js"></script>
+  <script src="../js/gist.js"></script>
+  <script src="../js/options.js"></script>
+</body>
+</html>

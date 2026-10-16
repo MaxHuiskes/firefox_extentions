@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <style>
+    :root {
+      --pad: 14px;
+      --text: #202124;
+      --muted: #5f6368;
+      --border: #dadce0;
+      --bg: #f9f9fb;
+      --primary: #0060df;
+      --primary-hover: #003eaa;
+      --ok: #137333;
+      --err: #c5221f;
+      --tap: 44px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: var(--pad);
+      padding-bottom: max(var(--pad), env(safe-area-inset-bottom));
+      width: 100%;
+      min-width: 280px;
+      max-width: 420px;
+      margin: 0 auto;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-text-size-adjust: 100%;
+    }
+
+    .header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    h3 {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      line-height: 1.35;
+      flex: 1;
+      min-width: 0;
+    }
+
+    input {
+      width: 100%;
+      margin-bottom: 10px;
+      padding: 12px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 16px;
+      background: #fff;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .top-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 2px;
+      min-height: 20px;
+    }
+
+    .status-msg {
+      font-size: 12px;
+      color: var(--ok);
+      font-weight: 500;
+      line-height: 1.3;
+      word-break: break-word;
+    }
+
+    .status-msg.err {
+      color: var(--err);
+    }
+
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-weight: 600;
+      font-size: 13px;
+      min-height: 40px;
+    }
+
+    .header-actions {
+      display: flex;
+      flex-shrink: 0;
+      gap: 8px;
+    }
+
+    .primary-btn {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .primary-btn:hover {
+      background: var(--primary-hover);
+    }
+
+    .primary-btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .secondary-btn {
+      background: #e0e0e0;
+      color: #333;
+    }
+
+    .secondary-btn:hover {
+      background: #d0d0d0;
+    }
+
+    hr {
+      margin: 16px 0;
+      border: none;
+      border-top: 1px solid #ddd;
+    }
+
+    .list-heading {
+      margin-bottom: 8px;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      max-height: min(50vh, 420px);
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 12px 0;
+      border-bottom: 1px solid #eee;
+    }
+
+    .info {
+      flex: 1;
+      font-size: 14px;
+      line-height: 1.35;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .info a {
+      color: #1a73e8;
+      text-decoration: none;
+      display: inline;
+    }
+
+    .info a:hover {
+      text-decoration: underline;
+    }
+
+    .info strong {
+      word-break: break-word;
+      white-space: normal;
+    }
+
+    .actions {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .icon-btn {
+      background: #eee;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      width: var(--tap);
+      height: var(--tap);
+      border-radius: 8px;
+      font-size: 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .empty-msg {
+      font-size: 13px;
+      color: #888;
+      text-align: center;
+      padding: 16px 0;
+    }
+
+    /* Phone / Android Firefox: full width, larger taps */
+    @media (max-width: 480px) {
+      body {
+        max-width: none;
+        padding: 16px;
+      }
+
+      .header-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+      }
+
+      .header-actions {
+        width: 100%;
+      }
+
+      .header-actions button {
+        flex: 1;
+        min-height: var(--tap);
+        font-size: 15px;
+      }
+
+      h3 {
+        font-size: 13px;
+      }
+
+      input {
+        font-size: 16px;
+        min-height: var(--tap);
+        margin-bottom: 12px;
+      }
+
+      li {
+        padding: 14px 0;
+        align-items: flex-start;
+      }
+
+      .info {
+        font-size: 15px;
+      }
+
+      ul {
+        max-height: none;
+      }
+    }
+
+    @media (min-width: 481px) {
+      body {
+        width: 420px;
+      }
+
+      input {
+        font-size: 13px;
+        padding: 8px 10px;
+      }
+
+      button {
+        padding: 6px 12px;
+        min-height: 0;
+        font-size: 12px;
+        border-radius: 4px;
+      }
+
+      .icon-btn {
+        width: auto;
+        height: auto;
+        padding: 4px;
+        background: none;
+        font-size: 14px;
+        border-radius: 4px;
+      }
+
+      .info {
+        font-size: 13px;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+
+      .info strong {
+        white-space: nowrap;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header-row">
+    <h3 id="form-title">Manga Bewerken / Toevoegen</h3>
+    <div class="header-actions">
+      <button id="gist-sync-btn" class="primary-btn" type="button">Sync</button>
+      <button id="open-options-btn" class="secondary-btn" type="button">⚙ Opties</button>
+    </div>
+  </div>
+
+  <input type="text" id="title" placeholder="Manga Titel" autocomplete="off">
+  <input type="url" id="url" placeholder="Pagina URL" autocomplete="off">
+  <input type="text" id="chapter" placeholder="Hoofdstuk / Aflevering" autocomplete="off">
+
+  <div class="top-actions">
+    <div id="status" class="status-msg"></div>
+  </div>
+
+  <hr>
+  <h3 class="list-heading">Opgeslagen Manga</h3>
+  <ul id="manga-list"></ul>
+
+  <script src="../js/storage.js"></script>
+  <script src="../js/popup.js"></script>
+</body>
+</html>

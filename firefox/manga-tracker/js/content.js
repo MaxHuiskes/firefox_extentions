@@ -230,7 +230,7 @@ function startCheck() {
   const interval = setInterval(() => {
     count++;
     autoUpdateProgress();
-    if (count >= 3) clearInterval(interval);
+    if (count >= 1) clearInterval(interval);
   }, 1000);
 }
 
