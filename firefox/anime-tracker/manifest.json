@@ -1,31 +1,33 @@
 {
   "manifest_version": 3,
   "name": "Anime Progress Tracker",
-  "version": "1.0.0",
-  "description": "Automatically track anime watching progress and sync across devices.",
+  "version": "1.2.0",
+  "description": "Track anime progress. Manual GitHub Gist sync or export/import between desktop and Android.",
   "permissions": [
     "storage",
     "activeTab",
     "tabs",
-    "scripting"
+    "scripting",
+    "alarms"
   ],
   "host_permissions": [
-    "<all_urls>"
+    "<all_urls>",
+    "https://api.github.com/*"
   ],
   "background": {
-    "scripts": ["background.js"]
+    "scripts": ["js/storage.js", "js/gist.js", "js/background.js"]
   },
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "html/popup.html"
   },
   "options_ui": {
-    "page": "options.html",
+    "page": "html/options.html",
     "open_in_tab": true
   },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js"],
+      "js": ["js/storage.js", "js/content.js"],
       "run_at": "document_idle"
     }
   ],
@@ -33,7 +35,7 @@
     "gecko": {
       "id": "anime-tracker-sync@yourdomain.com",
       "data_collection_permissions": {
-        "required": ["none"]
+        "required": ["authenticationInfo"]
       }
     }
   }

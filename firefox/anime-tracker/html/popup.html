@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <style>
+    :root {
+      --pad: 14px;
+      --text: #202124;
+      --muted: #5f6368;
+      --border: #dadce0;
+      --bg: #f9f9fb;
+      --card: #fff;
+      --primary: #0060df;
+      --primary-hover: #003eaa;
+      --ok: #137333;
+      --err: #c5221f;
+      --tap: 44px;
+    }
+
+    body.dark {
+      --text: #e8eaed;
+      --muted: #9aa0a6;
+      --border: #3c4043;
+      --bg: #202124;
+      --card: #292a2d;
+      --ok: #81c995;
+      --err: #f28b82;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: var(--pad);
+      padding-bottom: max(var(--pad), env(safe-area-inset-bottom));
+      width: 100%;
+      min-width: 280px;
+      max-width: 420px;
+      margin: 0 auto;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-text-size-adjust: 100%;
+    }
+
+    .header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    h3 {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      line-height: 1.35;
+      flex: 1;
+      min-width: 0;
+    }
+
+    input, select {
+      width: 100%;
+      margin-bottom: 10px;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 16px;
+      background: var(--card);
+      color: var(--text);
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .filters {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .filters input, .filters select { margin-bottom: 0; }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .toolbar .sync-meta {
+      flex: 1;
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.3;
+      min-width: 120px;
+    }
+
+    .top-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 2px;
+      min-height: 20px;
+    }
+
+    .status-msg {
+      font-size: 12px;
+      color: var(--ok);
+      font-weight: 500;
+      line-height: 1.3;
+      word-break: break-word;
+    }
+
+    .status-msg.err { color: var(--err); }
+
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-weight: 600;
+      font-size: 13px;
+      min-height: 40px;
+    }
+
+    .header-actions {
+      display: flex;
+      flex-shrink: 0;
+      gap: 8px;
+    }
+
+    .primary-btn { background: var(--primary); color: #fff; }
+    .primary-btn:hover { background: var(--primary-hover); }
+    .primary-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+    .secondary-btn { background: #e0e0e0; color: #333; }
+    body.dark .secondary-btn { background: #3c4043; color: #e8eaed; }
+    .secondary-btn:hover { background: #d0d0d0; }
+    .danger-btn { background: #c5221f; color: #fff; }
+    .danger-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    hr {
+      margin: 16px 0;
+      border: none;
+      border-top: 1px solid var(--border);
+    }
+
+    .list-heading {
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .list-heading .count {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: none;
+      letter-spacing: 0;
+      font-weight: 500;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      max-height: min(50vh, 420px);
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .check {
+      margin-top: 14px;
+      flex-shrink: 0;
+      width: 18px;
+      height: 18px;
+    }
+
+    .cover {
+      width: 40px;
+      height: 56px;
+      object-fit: cover;
+      border-radius: 4px;
+      background: var(--border);
+      flex-shrink: 0;
+    }
+
+    .cover.placeholder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .info {
+      flex: 1;
+      font-size: 14px;
+      line-height: 1.35;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .info a { color: #1a73e8; text-decoration: none; }
+    body.dark .info a { color: #8ab4f8; }
+    .info a:hover { text-decoration: underline; }
+    .info strong {
+      word-break: break-word;
+      white-space: normal;
+      display: block;
+    }
+
+    .meta {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .meta a.next {
+      font-weight: 600;
+      margin-left: 6px;
+    }
+
+    .status-select {
+      margin: 6px 0 0;
+      padding: 6px 8px;
+      font-size: 12px;
+      min-height: 0;
+      width: auto;
+      max-width: 100%;
+    }
+
+    .actions {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .icon-btn {
+      background: #eee;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      width: var(--tap);
+      height: var(--tap);
+      border-radius: 8px;
+      font-size: 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    body.dark .icon-btn { background: #3c4043; }
+
+    .empty-msg {
+      font-size: 13px;
+      color: var(--muted);
+      text-align: center;
+      padding: 16px 0;
+      display: block;
+      border: none;
+    }
+
+    .confirm-bar {
+      display: none;
+      gap: 8px;
+      margin-bottom: 10px;
+      padding: 10px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 13px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .confirm-bar.show { display: flex; }
+    .confirm-bar span { flex: 1; min-width: 120px; }
+
+    @media (max-width: 480px) {
+      body { max-width: none; padding: 16px; }
+      .header-row { flex-direction: column; align-items: stretch; gap: 12px; }
+      .header-actions { width: 100%; }
+      .header-actions button { flex: 1; min-height: var(--tap); font-size: 15px; }
+      h3 { font-size: 13px; }
+      input, select { font-size: 16px; min-height: var(--tap); }
+      li { padding: 14px 0; }
+      .info { font-size: 15px; }
+      ul { max-height: none; }
+      .filters { grid-template-columns: 1fr; }
+    }
+
+    @media (min-width: 481px) {
+      body { width: 420px; }
+      input, select { font-size: 13px; padding: 8px 10px; }
+      button { padding: 6px 12px; min-height: 0; font-size: 12px; border-radius: 4px; }
+      .icon-btn {
+        width: auto; height: auto; padding: 4px;
+        background: none; font-size: 14px; border-radius: 4px;
+      }
+      body.dark .icon-btn { background: none; }
+      .info { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header-row">
+    <h3 id="form-title">Anime Bewerken / Toevoegen</h3>
+    <div class="header-actions">
+      <button id="gist-sync-btn" class="primary-btn" type="button">Sync</button>
+      <button id="theme-btn" class="secondary-btn" type="button" title="Dark mode">☾</button>
+      <button id="open-options-btn" class="secondary-btn" type="button">⚙</button>
+    </div>
+  </div>
+
+  <input type="text" id="title" placeholder="Anime Titel" autocomplete="off">
+  <input type="url" id="url" placeholder="Pagina URL" autocomplete="off">
+  <div class="row-2">
+    <input type="text" id="episode" placeholder="Aflevering" autocomplete="off">
+    <select id="status">
+      <option value="watching">Watching</option>
+      <option value="hold">On hold</option>
+      <option value="dropped">Dropped</option>
+      <option value="finished">Finished</option>
+    </select>
+  </div>
+
+  <div class="top-actions">
+    <div id="status-msg" class="status-msg"></div>
+  </div>
+
+  <hr>
+  <div class="list-heading">
+    <h3>Opgeslagen Anime</h3>
+    <span id="list-count" class="count"></span>
+  </div>
+
+  <div class="filters">
+    <input type="search" id="search" placeholder="Search…" autocomplete="off">
+    <select id="sort">
+      <option value="updated">Sort: Recent</option>
+      <option value="title">Sort: Title A–Z</option>
+      <option value="episode">Sort: Episode</option>
+      <option value="status">Sort: Status</option>
+    </select>
+  </div>
+  <div class="filters">
+    <select id="filter-status">
+      <option value="all">All statuses</option>
+      <option value="watching">Watching</option>
+      <option value="hold">On hold</option>
+      <option value="dropped">Dropped</option>
+      <option value="finished">Finished</option>
+    </select>
+    <select id="filter-site">
+      <option value="all">All sites</option>
+    </select>
+  </div>
+
+  <div class="toolbar">
+    <button id="bulk-select-btn" class="secondary-btn" type="button">Select</button>
+    <button id="bulk-delete-btn" class="danger-btn" type="button" disabled>Delete selected</button>
+    <button id="ignore-site-btn" class="secondary-btn" type="button" title="Ignore current site">Ignore site</button>
+    <div id="sync-meta" class="sync-meta"></div>
+  </div>
+
+  <div id="confirm-bar" class="confirm-bar">
+    <span id="confirm-text"></span>
+    <button id="confirm-yes" class="danger-btn" type="button">Confirm</button>
+    <button id="confirm-no" class="secondary-btn" type="button">Cancel</button>
+  </div>
+
+  <ul id="anime-list"></ul>
+
+  <script src="../js/storage.js"></script>
+  <script src="../js/popup.js"></script>
+</body>
+</html>
