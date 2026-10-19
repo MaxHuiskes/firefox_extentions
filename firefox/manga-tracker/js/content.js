@@ -5,9 +5,61 @@ function normalizeString(str) {
     .trim();
 }
 
+function hostMatches(list, hostname) {
+  return (list || []).some((site) => site && hostname.includes(site.trim()));
+}
+
+function detectSite() {
+  const host = window.location.hostname.replace(/^www\./, "");
+  if (/mangakakalot|manganato|natomanga|chapmanganato|readmanganato/i.test(host)) {
+    return "mangakakalot";
+  }
+  if (/mangadex\.org/i.test(host)) return "mangadex";
+  if (/comick\./i.test(host)) return "comick";
+  if (/webtoons\.com/i.test(host)) return "webtoons";
+  return "generic";
+}
+
+function extractCover() {
+  const og =
+    document.querySelector('meta[property="og:image"]')?.content ||
+    document.querySelector('meta[name="twitter:image"]')?.content ||
+    "";
+  if (og) return og;
+
+  const img =
+    document.querySelector(".manga-info-pic img") ||
+    document.querySelector(".info-image img") ||
+    document.querySelector("img.cover") ||
+    document.querySelector(".series-cover img");
+  return img?.src || "";
+}
+
 function extractChapterInfo() {
+  const site = detectSite();
   const url = window.location.href;
-  const urlMatch = url.match(/chapter-(\d+(?:[-\.]\d+)*)/i);
+
+  if (site === "mangadex") {
+    const m = url.match(/chapter\/([0-9a-f-]{36})/i);
+    const heading = document.querySelector("h1, .chapter-title, [class*='chapter']");
+    const textMatch = heading?.textContent?.match(
+      /(?:chapter|ch\.?)\s*(\d+(?:\.\d+)?)/i
+    );
+    if (textMatch) return textMatch[1];
+    if (m) return ""; // UUID only — fall through
+  }
+
+  if (site === "comick") {
+    const m = url.match(/\/(?:comic|chapter)\/[^/]+\/(\d+(?:\.\d+)?)/i);
+    if (m) return m[1];
+  }
+
+  if (site === "webtoons") {
+    const m = url.match(/[?&]episode_no=(\d+)/i);
+    if (m) return m[1];
+  }
+
+  const urlMatch = url.match(/chapter[/_-]?(\d+(?:[-\.]\d+)*)/i);
   if (urlMatch) {
     return urlMatch[1].replace(/-/g, ".");
   }
@@ -18,7 +70,7 @@ function extractChapterInfo() {
     document.querySelector("h1");
   if (currentChapterEl) {
     const match = currentChapterEl.textContent.match(
-      /(?:chapter|ch\.?)\s*(\d+(?:[-\.]\d+)*)/i
+      /(?:chapter|ch\.?|episode|ep\.?)\s*(\d+(?:[.-]\d+)*)/i
     );
     if (match) return match[1].replace(/-/g, ".");
   }
@@ -27,7 +79,10 @@ function extractChapterInfo() {
 }
 
 function titleFromMangaUrl() {
-  const match = window.location.pathname.match(/\/manga\/([^/]+)/i);
+  const match =
+    window.location.pathname.match(/\/manga\/([^/]+)/i) ||
+    window.location.pathname.match(/\/comic\/([^/]+)/i) ||
+    window.location.pathname.match(/\/title\/[^/]+\/([^/]+)/i);
   if (!match) return "";
   return decodeURIComponent(match[1])
     .replace(/[-_]+/g, " ")
@@ -48,6 +103,9 @@ function isGenericTitle(title) {
     "comics",
     "webtoon",
     "mangakakalot",
+    "manganato",
+    "mangadex",
+    "comick",
     "chapter",
     "free",
     "freeonline",
@@ -69,6 +127,10 @@ function cleanTitleCandidate(raw) {
       .replace(/^Read\s+/i, "")
       .replace(/\s*\|.*$/, "")
       .replace(/\s*-\s*MangaKakalot.*$/i, "")
+      .replace(/\s*-\s*MangaNato.*$/i, "")
+      .replace(/\s*-\s*MangaDex.*$/i, "")
+      .replace(/\s*-\s*ComicK.*$/i, "")
+      .replace(/\s*-\s*WEBTOON.*$/i, "")
       .replace(/\s*-\s*Read\s+.*$/i, "")
       .replace(/\s*-\s*Chapter\s+\d+(?:[.-]\d+)*\b.*$/i, "")
       .replace(/\s+Chapter\s+\d+(?:[.-]\d+)*\b.*$/i, "")
@@ -104,6 +166,23 @@ function titleFromHeading() {
 }
 
 function extractMangaTitle() {
+  const site = detectSite();
+
+  if (site === "mangadex") {
+    const md =
+      document.querySelector("a[href*='/title/']")?.textContent ||
+      document.querySelector(".manga-title, .title a")?.textContent;
+    const cleaned = cleanTitleCandidate(md);
+    if (cleaned) return cleaned;
+  }
+
+  if (site === "comick") {
+    const c =
+      document.querySelector("h1 a, .comic-title, h1")?.textContent || "";
+    const cleaned = cleanTitleCandidate(c.replace(/\s+Ch\..*$/i, ""));
+    if (cleaned) return cleaned;
+  }
+
   const fromHeading = titleFromHeading();
   if (fromHeading) return fromHeading;
 
@@ -125,7 +204,7 @@ function extractMangaTitle() {
   return titleFromMangaUrl();
 }
 
-function showPageNotification(message) {
+function showPageNotification(message, isError = false) {
   let noti = document.getElementById("manga-tracker-toast");
   if (!noti) {
     noti = document.createElement("div");
@@ -134,7 +213,6 @@ function showPageNotification(message) {
       position: fixed;
       bottom: 20px;
       right: 20px;
-      background: #27ae60;
       color: white;
       padding: 10px 16px;
       border-radius: 8px;
@@ -144,9 +222,11 @@ function showPageNotification(message) {
       z-index: 999999;
       box-shadow: 0 4px 12px rgba(0,0,0,0.3);
       transition: opacity 0.3s ease;
+      max-width: min(90vw, 320px);
     `;
     document.body.appendChild(noti);
   }
+  noti.style.background = isError ? "#c0392b" : "#27ae60";
   noti.textContent = message;
   noti.style.opacity = "1";
 
@@ -157,31 +237,26 @@ function showPageNotification(message) {
 
 async function autoUpdateProgress() {
   try {
-    const hostname = window.location.hostname;
+    const hostname = window.location.hostname.replace(/^www\./, "");
     const storage = await getTrackerStorage();
     const allowedSites = storage.allowedSites || [];
+    const ignoredSites = storage.ignoredSites || [];
     const mangaList = storage.mangaList || [];
 
-    const isAllowed =
-      allowedSites.length === 0 ||
-      allowedSites.some((site) => site && hostname.includes(site.trim()));
-    if (!isAllowed) {
-      console.log(
-        `[Manga Tracker] Skip: site not allowed (${hostname}). Allowed: ${allowedSites.join(", ")}`
-      );
+    if (hostMatches(ignoredSites, hostname)) {
       return;
     }
+
+    const isAllowed =
+      allowedSites.length === 0 || hostMatches(allowedSites, hostname);
+    if (!isAllowed) return;
 
     const chapter = extractChapterInfo();
     const title = extractMangaTitle();
     const url = window.location.href;
+    const cover = extractCover();
 
-    if (!title || !chapter) {
-      console.log(
-        `[Manga Tracker] Skip: missing title/chapter (title="${title}", chapter="${chapter}")`
-      );
-      return;
-    }
+    if (!title || !chapter) return;
 
     const cleanCurrentTitle = normalizeString(title);
 
@@ -196,31 +271,36 @@ async function autoUpdateProgress() {
       );
     });
 
-    const newEntry = { title, url, chapter, updatedAt: Date.now() };
+    const newEntry = {
+      title,
+      url,
+      chapter,
+      cover: cover || undefined,
+      updatedAt: Date.now(),
+      status: "reading",
+    };
 
     if (existingIndex >= 0) {
-      if (
-        mangaList[existingIndex].chapter === chapter &&
-        mangaList[existingIndex].url === url
-      ) {
-        console.log(
-          `[Manga Tracker] Already saved: ${title} Ch. ${chapter}`
-        );
+      const prev = mangaList[existingIndex];
+      if (prev.chapter === chapter && prev.url === url && prev.cover === cover) {
         return;
       }
 
-      mangaList[existingIndex] = { ...mangaList[existingIndex], ...newEntry };
+      mangaList[existingIndex] = {
+        ...prev,
+        ...newEntry,
+        status: normalizeStatus(prev.status) === "finished" ? "reading" : prev.status,
+        cover: cover || prev.cover,
+      };
       await setTrackerStorage({ mangaList });
-      console.log(`[Manga Tracker] Auto-opgeslagen: ${title} Ch. ${chapter}`);
       showPageNotification(`✓ Voortgang opgeslagen: Ch. ${chapter}`);
     } else {
       mangaList.unshift(newEntry);
       await setTrackerStorage({ mangaList });
-      console.log(`[Manga Tracker] Auto-toegevoegd: ${title} Ch. ${chapter}`);
       showPageNotification(`✓ Manga toegevoegd: Ch. ${chapter}`);
     }
-  } catch (err) {
-    console.error("[Manga Tracker] Auto-update failed:", err);
+  } catch (_err) {
+    // ignore
   }
 }
 
@@ -249,6 +329,19 @@ browser.runtime.onMessage.addListener((request) => {
       title: extractMangaTitle(),
       chapter: extractChapterInfo(),
       url: window.location.href,
+      cover: extractCover(),
+      hostname: window.location.hostname.replace(/^www\./, ""),
     });
+  } else if (request.action === "ignoreCurrentSite") {
+    return (async () => {
+      const hostname = window.location.hostname.replace(/^www\./, "");
+      const { ignoredSites = [] } = await getTrackerStorage();
+      if (!ignoredSites.includes(hostname)) {
+        ignoredSites.push(hostname);
+        await setTrackerStorage({ ignoredSites });
+      }
+      showPageNotification(`Site ignored: ${hostname}`);
+      return { hostname, ignoredSites };
+    })();
   }
 });

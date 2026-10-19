@@ -1,16 +1,60 @@
+const DAILY_SYNC_ALARM = "manga-daily-gist-sync";
+
 async function warmStorage() {
   await getTrackerStorage();
+  await refreshBadge();
+  await setupDailyAlarm();
+}
+
+async function refreshBadge() {
+  try {
+    const { mangaList = [] } = await getTrackerStorage();
+    const count = countRecentUpdates(mangaList);
+    await browser.action.setBadgeBackgroundColor({ color: "#0060df" });
+    await browser.action.setBadgeText({
+      text: count > 0 ? String(Math.min(count, 99)) : "",
+    });
+  } catch (_e) {
+    // ignore
+  }
+}
+
+async function setupDailyAlarm() {
+  const { dailyAutoSync } = await getSettingsFlags();
+  await browser.alarms.clear(DAILY_SYNC_ALARM);
+  if (!dailyAutoSync) return;
+
+  await browser.alarms.create(DAILY_SYNC_ALARM, {
+    periodInMinutes: 24 * 60,
+    when: Date.now() + 60 * 1000,
+  });
 }
 
 browser.runtime.onInstalled.addListener(warmStorage);
 browser.runtime.onStartup.addListener(warmStorage);
 warmStorage();
 
+browser.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local") return;
+  if (changes.mangaList || changes.deletedManga) {
+    refreshBadge();
+  }
+  if (changes.dailyAutoSync) {
+    setupDailyAlarm();
+  }
+});
+
+browser.alarms.onAlarm.addListener(async (alarm) => {
+  if (alarm.name !== DAILY_SYNC_ALARM) return;
+  const { dailyAutoSync } = await getSettingsFlags();
+  if (!dailyAutoSync) return;
+  await forcePullThenPush();
+  await refreshBadge();
+});
+
 browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === "complete" && tab.url) {
-    browser.tabs.sendMessage(tabId, { action: "autoUpdate" }).catch(() => {
-      // Content script is nog niet actief op deze specifieke tab
-    });
+    browser.tabs.sendMessage(tabId, { action: "autoUpdate" }).catch(() => {});
   }
 });
 
@@ -44,6 +88,7 @@ async function runGistJob(mode, options = {}) {
       lastGistSyncError: "",
       lastGistSyncMode: mode,
     });
+    await refreshBadge();
     return { skipped: Boolean(result.skipped), ...result };
   } catch (err) {
     const message = err && err.message ? err.message : String(err);
@@ -92,6 +137,14 @@ browser.runtime.onMessage.addListener((message) => {
 
   if (message.action === "forceGistSync") {
     return forcePullThenPush();
+  }
+
+  if (message.action === "refreshBadge") {
+    return refreshBadge().then(() => ({ ok: true }));
+  }
+
+  if (message.action === "setupDailyAlarm") {
+    return setupDailyAlarm().then(() => ({ ok: true }));
   }
 
   if (message.action === "getGistSyncStatus") {

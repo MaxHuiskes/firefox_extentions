@@ -67,14 +67,20 @@ async function markRateLimited(res) {
   });
 }
 
-function buildGistPayload(mangaList, allowedSites, deletedManga = {}) {
+function buildGistPayload(
+  mangaList,
+  allowedSites,
+  deletedManga = {},
+  ignoredSites = []
+) {
   return {
     format: "manga-tracker-backup",
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
     dataUpdatedAt: Date.now(),
     mangaList: mangaList || [],
     allowedSites: allowedSites || [],
+    ignoredSites: ignoredSites || [],
     deletedManga: deletedManga || {},
   };
 }
@@ -203,7 +209,8 @@ async function uploadLocalGist(token, gistId, local) {
   const payload = buildGistPayload(
     local.mangaList || [],
     local.allowedSites || [],
-    local.deletedManga || {}
+    local.deletedManga || {},
+    local.ignoredSites || []
   );
 
   if (gistId) {
@@ -216,10 +223,11 @@ async function uploadLocalGist(token, gistId, local) {
   return created.id;
 }
 
-function snapshotHash(mangaList, allowedSites, deletedManga) {
+function snapshotHash(mangaList, allowedSites, deletedManga, ignoredSites) {
   return JSON.stringify({
     mangaList: mangaList || [],
     allowedSites: allowedSites || [],
+    ignoredSites: ignoredSites || [],
     deletedManga: deletedManga || {},
   });
 }
@@ -242,7 +250,8 @@ async function syncWithGithubGist(options = {}) {
     const hash = snapshotHash(
       local.mangaList,
       local.allowedSites,
-      local.deletedManga
+      local.deletedManga,
+      local.ignoredSites
     );
     await uploadLocalGist(token, gistId, local);
     await browser.storage.local.set({ lastGistPushHash: hash });
@@ -303,18 +312,32 @@ async function syncWithGithubGist(options = {}) {
         ? remote.allowedSites
         : local.allowedSites || [];
 
+  const ignoredSites =
+    localUpdatedAt >= remoteUpdatedAt
+      ? local.ignoredSites || []
+      : Array.isArray(remote?.ignoredSites)
+        ? remote.ignoredSites
+        : local.ignoredSites || [];
+
   const beforeHash = snapshotHash(
     local.mangaList,
     local.allowedSites,
-    local.deletedManga
+    local.deletedManga,
+    local.ignoredSites
   );
-  const afterHash = snapshotHash(mergedManga, allowedSites, deletedManga);
+  const afterHash = snapshotHash(
+    mergedManga,
+    allowedSites,
+    deletedManga,
+    ignoredSites
+  );
   const changed = beforeHash !== afterHash;
 
   if (changed) {
     await setTrackerStorage({
       mangaList: mergedManga,
       allowedSites,
+      ignoredSites,
       deletedManga,
       dataUpdatedAt: Date.now(),
     });
@@ -324,10 +347,16 @@ async function syncWithGithubGist(options = {}) {
     activeGistId = await uploadLocalGist(token, activeGistId, {
       mangaList: mergedManga,
       allowedSites,
+      ignoredSites,
       deletedManga,
     });
     await browser.storage.local.set({
-      lastGistPushHash: snapshotHash(mergedManga, allowedSites, deletedManga),
+      lastGistPushHash: snapshotHash(
+        mergedManga,
+        allowedSites,
+        deletedManga,
+        ignoredSites
+      ),
     });
   }
 

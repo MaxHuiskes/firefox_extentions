@@ -8,13 +8,21 @@ function setStatus(el, message, isError = false) {
   }
 }
 
-function buildExportPayload(mangaList, allowedSites) {
+function parseSiteList(raw) {
+  return String(raw || "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function buildExportPayload(mangaList, allowedSites, ignoredSites) {
   return {
     format: "manga-tracker-backup",
-    version: 1,
+    version: 3,
     exportedAt: new Date().toISOString(),
     mangaList: mangaList || [],
     allowedSites: allowedSites || [],
+    ignoredSites: ignoredSites || [],
   };
 }
 
@@ -26,9 +34,10 @@ function parseImportPayload(raw) {
 
   const mangaList = Array.isArray(data.mangaList) ? data.mangaList : null;
   const allowedSites = Array.isArray(data.allowedSites) ? data.allowedSites : null;
+  const ignoredSites = Array.isArray(data.ignoredSites) ? data.ignoredSites : null;
 
-  if (!mangaList && !allowedSites) {
-    throw new Error("JSON must include mangaList and/or allowedSites");
+  if (!mangaList && !allowedSites && !ignoredSites) {
+    throw new Error("JSON must include mangaList and/or site lists");
   }
 
   for (const item of mangaList || []) {
@@ -40,9 +49,15 @@ function parseImportPayload(raw) {
   return {
     mangaList: mangaList || [],
     allowedSites: allowedSites || [],
+    ignoredSites: ignoredSites || [],
     hasMangaList: Array.isArray(data.mangaList),
     hasAllowedSites: Array.isArray(data.allowedSites),
+    hasIgnoredSites: Array.isArray(data.ignoredSites),
   };
+}
+
+function applyDarkMode(on) {
+  document.body.classList.toggle("dark", Boolean(on));
 }
 
 async function refreshGistUi() {
@@ -92,19 +107,54 @@ async function refreshGistUi() {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
-  const { allowedSites = [] } = await getTrackerStorage();
-  document.getElementById("sites").value = allowedSites.join(", ");
+  const storage = await getTrackerStorage();
+  document.getElementById("sites").value = (storage.allowedSites || []).join(", ");
+  document.getElementById("ignored").value = (storage.ignoredSites || []).join(
+    ", "
+  );
+  document.getElementById("dark-mode").checked = Boolean(storage.darkMode);
+  document.getElementById("daily-auto-sync").checked = Boolean(
+    storage.dailyAutoSync
+  );
+  applyDarkMode(storage.darkMode);
   await refreshGistUi();
 });
 
-document.getElementById("save").addEventListener("click", async () => {
-  const rawInput = document.getElementById("sites").value;
-  const allowedSites = rawInput
-    .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
+document.getElementById("dark-mode").addEventListener("change", async (e) => {
+  const darkMode = Boolean(e.target.checked);
+  applyDarkMode(darkMode);
+  await setTrackerStorage({ darkMode });
+});
 
-  await setTrackerStorage({ allowedSites });
+document
+  .getElementById("daily-auto-sync")
+  .addEventListener("change", async (e) => {
+    const dailyAutoSync = Boolean(e.target.checked);
+    await setTrackerStorage({ dailyAutoSync });
+    try {
+      await browser.runtime.sendMessage({ action: "setupDailyAlarm" });
+    } catch (_e) {
+      // ignore
+    }
+  });
+
+document.getElementById("save").addEventListener("click", async () => {
+  const allowedSites = parseSiteList(document.getElementById("sites").value);
+  const ignoredSites = parseSiteList(document.getElementById("ignored").value);
+  const darkMode = document.getElementById("dark-mode").checked;
+  const dailyAutoSync = document.getElementById("daily-auto-sync").checked;
+
+  await setTrackerStorage({
+    allowedSites,
+    ignoredSites,
+    darkMode,
+    dailyAutoSync,
+  });
+  try {
+    await browser.runtime.sendMessage({ action: "setupDailyAlarm" });
+  } catch (_e) {
+    // ignore
+  }
   setStatus(document.getElementById("status"), "Settings saved successfully!");
 });
 
@@ -138,8 +188,13 @@ document.getElementById("gist-sync").addEventListener("click", async () => {
     }
     await refreshGistUi();
 
-    const { allowedSites = [] } = await getTrackerStorage();
-    document.getElementById("sites").value = allowedSites.join(", ");
+    const storage = await getTrackerStorage();
+    document.getElementById("sites").value = (storage.allowedSites || []).join(
+      ", "
+    );
+    document.getElementById("ignored").value = (
+      storage.ignoredSites || []
+    ).join(", ");
 
     if (result && result.error) {
       setStatus(gistStatus, `Sync failed: ${result.error}`, true);
@@ -167,17 +222,18 @@ document.getElementById("gist-clear").addEventListener("click", async () => {
 document.getElementById("export-btn").addEventListener("click", async () => {
   const transferStatus = document.getElementById("transfer-status");
   try {
-    const { mangaList = [], allowedSites = [] } = await getTrackerStorage();
-    const payload = buildExportPayload(mangaList, allowedSites);
+    const {
+      mangaList = [],
+      allowedSites = [],
+      ignoredSites = [],
+    } = await getTrackerStorage();
+    const payload = buildExportPayload(mangaList, allowedSites, ignoredSites);
     document.getElementById("transfer-data").value = JSON.stringify(
       payload,
       null,
       2
     );
-    setStatus(
-      transferStatus,
-      `Exported ${mangaList.length} manga.`
-    );
+    setStatus(transferStatus, `Exported ${mangaList.length} manga.`);
   } catch (err) {
     setStatus(transferStatus, `Export failed: ${err.message}`, true);
   }
@@ -230,11 +286,18 @@ async function importFromText(raw) {
 
   const next = {};
   if (parsed.hasMangaList) {
-    next.mangaList = parsed.mangaList;
+    next.mangaList = mergeMangaLists(
+      current.mangaList || [],
+      parsed.mangaList
+    );
   }
   if (parsed.hasAllowedSites) {
     next.allowedSites = parsed.allowedSites;
     document.getElementById("sites").value = parsed.allowedSites.join(", ");
+  }
+  if (parsed.hasIgnoredSites) {
+    next.ignoredSites = parsed.ignoredSites;
+    document.getElementById("ignored").value = parsed.ignoredSites.join(", ");
   }
 
   await setTrackerStorage(next);

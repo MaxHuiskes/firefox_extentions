@@ -10,6 +10,7 @@
       --muted: #5f6368;
       --border: #dadce0;
       --bg: #f9f9fb;
+      --card: #fff;
       --primary: #0060df;
       --primary-hover: #003eaa;
       --ok: #137333;
@@ -17,9 +18,17 @@
       --tap: 44px;
     }
 
-    * {
-      box-sizing: border-box;
+    body.dark {
+      --text: #e8eaed;
+      --muted: #9aa0a6;
+      --border: #3c4043;
+      --bg: #202124;
+      --card: #292a2d;
+      --ok: #81c995;
+      --err: #f28b82;
     }
+
+    * { box-sizing: border-box; }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -53,19 +62,52 @@
       min-width: 0;
     }
 
-    input {
+    input, select {
       width: 100%;
       margin-bottom: 10px;
-      padding: 12px 12px;
+      padding: 12px;
       border: 1px solid var(--border);
       border-radius: 8px;
       font-size: 16px;
-      background: #fff;
+      background: var(--card);
+      color: var(--text);
     }
 
-    input:focus {
+    input:focus, select:focus {
       outline: none;
       border-color: var(--primary);
+    }
+
+    .row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .filters {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .filters input { margin-bottom: 0; }
+    .filters select { margin-bottom: 0; }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .toolbar .sync-meta {
+      flex: 1;
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.3;
+      min-width: 120px;
     }
 
     .top-actions {
@@ -84,9 +126,7 @@
       word-break: break-word;
     }
 
-    .status-msg.err {
-      color: var(--err);
-    }
+    .status-msg.err { color: var(--err); }
 
     button {
       cursor: pointer;
@@ -104,37 +144,36 @@
       gap: 8px;
     }
 
-    .primary-btn {
-      background: var(--primary);
-      color: #fff;
-    }
-
-    .primary-btn:hover {
-      background: var(--primary-hover);
-    }
-
-    .primary-btn:disabled {
-      opacity: 0.55;
-      cursor: not-allowed;
-    }
-
-    .secondary-btn {
-      background: #e0e0e0;
-      color: #333;
-    }
-
-    .secondary-btn:hover {
-      background: #d0d0d0;
-    }
+    .primary-btn { background: var(--primary); color: #fff; }
+    .primary-btn:hover { background: var(--primary-hover); }
+    .primary-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+    .secondary-btn { background: #e0e0e0; color: #333; }
+    body.dark .secondary-btn { background: #3c4043; color: #e8eaed; }
+    .secondary-btn:hover { background: #d0d0d0; }
+    body.dark .secondary-btn:hover { background: #5f6368; }
+    .danger-btn { background: #c5221f; color: #fff; }
+    .danger-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
     hr {
       margin: 16px 0;
       border: none;
-      border-top: 1px solid #ddd;
+      border-top: 1px solid var(--border);
     }
 
     .list-heading {
       margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .list-heading .count {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: none;
+      letter-spacing: 0;
+      font-weight: 500;
     }
 
     ul {
@@ -148,11 +187,34 @@
 
     li {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
+      align-items: flex-start;
+      gap: 10px;
       padding: 12px 0;
-      border-bottom: 1px solid #eee;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .check {
+      margin-top: 14px;
+      flex-shrink: 0;
+      width: 18px;
+      height: 18px;
+    }
+
+    .cover {
+      width: 40px;
+      height: 56px;
+      object-fit: cover;
+      border-radius: 4px;
+      background: var(--border);
+      flex-shrink: 0;
+    }
+
+    .cover.placeholder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: var(--muted);
     }
 
     .info {
@@ -166,16 +228,33 @@
     .info a {
       color: #1a73e8;
       text-decoration: none;
-      display: inline;
     }
-
-    .info a:hover {
-      text-decoration: underline;
-    }
-
+    body.dark .info a { color: #8ab4f8; }
+    .info a:hover { text-decoration: underline; }
     .info strong {
       word-break: break-word;
       white-space: normal;
+      display: block;
+    }
+
+    .meta {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .meta a.next {
+      font-weight: 600;
+      margin-left: 6px;
+    }
+
+    .status-select {
+      margin: 6px 0 0;
+      padding: 6px 8px;
+      font-size: 12px;
+      min-height: 0;
+      width: auto;
+      max-width: 100%;
     }
 
     .actions {
@@ -197,96 +276,55 @@
       align-items: center;
       justify-content: center;
     }
+    body.dark .icon-btn { background: #3c4043; }
 
     .empty-msg {
       font-size: 13px;
-      color: #888;
+      color: var(--muted);
       text-align: center;
       padding: 16px 0;
+      display: block;
+      border: none;
     }
 
-    /* Phone / Android Firefox: full width, larger taps */
+    .confirm-bar {
+      display: none;
+      gap: 8px;
+      margin-bottom: 10px;
+      padding: 10px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 13px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .confirm-bar.show { display: flex; }
+    .confirm-bar span { flex: 1; min-width: 120px; }
+
     @media (max-width: 480px) {
-      body {
-        max-width: none;
-        padding: 16px;
-      }
-
-      .header-row {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 12px;
-      }
-
-      .header-actions {
-        width: 100%;
-      }
-
-      .header-actions button {
-        flex: 1;
-        min-height: var(--tap);
-        font-size: 15px;
-      }
-
-      h3 {
-        font-size: 13px;
-      }
-
-      input {
-        font-size: 16px;
-        min-height: var(--tap);
-        margin-bottom: 12px;
-      }
-
-      li {
-        padding: 14px 0;
-        align-items: flex-start;
-      }
-
-      .info {
-        font-size: 15px;
-      }
-
-      ul {
-        max-height: none;
-      }
+      body { max-width: none; padding: 16px; }
+      .header-row { flex-direction: column; align-items: stretch; gap: 12px; }
+      .header-actions { width: 100%; }
+      .header-actions button { flex: 1; min-height: var(--tap); font-size: 15px; }
+      h3 { font-size: 13px; }
+      input, select { font-size: 16px; min-height: var(--tap); }
+      li { padding: 14px 0; }
+      .info { font-size: 15px; }
+      ul { max-height: none; }
+      .filters { grid-template-columns: 1fr; }
     }
 
     @media (min-width: 481px) {
-      body {
-        width: 420px;
-      }
-
-      input {
-        font-size: 13px;
-        padding: 8px 10px;
-      }
-
-      button {
-        padding: 6px 12px;
-        min-height: 0;
-        font-size: 12px;
-        border-radius: 4px;
-      }
-
+      body { width: 420px; }
+      input, select { font-size: 13px; padding: 8px 10px; }
+      button { padding: 6px 12px; min-height: 0; font-size: 12px; border-radius: 4px; }
       .icon-btn {
-        width: auto;
-        height: auto;
-        padding: 4px;
-        background: none;
-        font-size: 14px;
-        border-radius: 4px;
+        width: auto; height: auto; padding: 4px;
+        background: none; font-size: 14px; border-radius: 4px;
       }
-
-      .info {
-        font-size: 13px;
-        white-space: nowrap;
-        text-overflow: ellipsis;
-      }
-
-      .info strong {
-        white-space: nowrap;
-      }
+      body.dark .icon-btn { background: none; }
+      .info { font-size: 13px; }
     }
   </style>
 </head>
@@ -295,20 +333,68 @@
     <h3 id="form-title">Manga Bewerken / Toevoegen</h3>
     <div class="header-actions">
       <button id="gist-sync-btn" class="primary-btn" type="button">Sync</button>
-      <button id="open-options-btn" class="secondary-btn" type="button">⚙ Opties</button>
+      <button id="theme-btn" class="secondary-btn" type="button" title="Dark mode">☾</button>
+      <button id="open-options-btn" class="secondary-btn" type="button">⚙</button>
     </div>
   </div>
 
   <input type="text" id="title" placeholder="Manga Titel" autocomplete="off">
   <input type="url" id="url" placeholder="Pagina URL" autocomplete="off">
-  <input type="text" id="chapter" placeholder="Hoofdstuk / Aflevering" autocomplete="off">
+  <div class="row-2">
+    <input type="text" id="chapter" placeholder="Hoofdstuk" autocomplete="off">
+    <select id="status">
+      <option value="reading">Reading</option>
+      <option value="hold">On hold</option>
+      <option value="dropped">Dropped</option>
+      <option value="finished">Finished</option>
+    </select>
+  </div>
 
   <div class="top-actions">
-    <div id="status" class="status-msg"></div>
+    <div id="status-msg" class="status-msg"></div>
   </div>
 
   <hr>
-  <h3 class="list-heading">Opgeslagen Manga</h3>
+  <div class="list-heading">
+    <h3>Opgeslagen Manga</h3>
+    <span id="list-count" class="count"></span>
+  </div>
+
+  <div class="filters">
+    <input type="search" id="search" placeholder="Search…" autocomplete="off">
+    <select id="sort">
+      <option value="updated">Sort: Recent</option>
+      <option value="title">Sort: Title A–Z</option>
+      <option value="chapter">Sort: Chapter</option>
+      <option value="status">Sort: Status</option>
+    </select>
+  </div>
+  <div class="filters">
+    <select id="filter-status">
+      <option value="all">All statuses</option>
+      <option value="reading">Reading</option>
+      <option value="hold">On hold</option>
+      <option value="dropped">Dropped</option>
+      <option value="finished">Finished</option>
+    </select>
+    <select id="filter-site">
+      <option value="all">All sites</option>
+    </select>
+  </div>
+
+  <div class="toolbar">
+    <button id="bulk-select-btn" class="secondary-btn" type="button">Select</button>
+    <button id="bulk-delete-btn" class="danger-btn" type="button" disabled>Delete selected</button>
+    <button id="ignore-site-btn" class="secondary-btn" type="button" title="Ignore current site">Ignore site</button>
+    <div id="sync-meta" class="sync-meta"></div>
+  </div>
+
+  <div id="confirm-bar" class="confirm-bar">
+    <span id="confirm-text"></span>
+    <button id="confirm-yes" class="danger-btn" type="button">Confirm</button>
+    <button id="confirm-no" class="secondary-btn" type="button">Cancel</button>
+  </div>
+
   <ul id="manga-list"></ul>
 
   <script src="../js/storage.js"></script>
