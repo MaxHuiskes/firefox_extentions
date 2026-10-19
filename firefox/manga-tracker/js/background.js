@@ -1,10 +1,10 @@
-async function migrateLocalToSync() {
+async function warmStorage() {
   await getTrackerStorage();
 }
 
-browser.runtime.onInstalled.addListener(migrateLocalToSync);
-browser.runtime.onStartup.addListener(migrateLocalToSync);
-migrateLocalToSync();
+browser.runtime.onInstalled.addListener(warmStorage);
+browser.runtime.onStartup.addListener(warmStorage);
+warmStorage();
 
 browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === "complete" && tab.url) {

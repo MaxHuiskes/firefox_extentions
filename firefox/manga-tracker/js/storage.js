@@ -6,10 +6,10 @@ function mangaKey(title) {
     .replace(/[^a-z0-9]/g, "");
 }
 
-function mergeMangaLists(syncList = [], localList = []) {
+function mergeMangaLists(a = [], b = []) {
   const byKey = new Map();
 
-  for (const item of [...localList, ...syncList]) {
+  for (const item of [...a, ...b]) {
     if (!item || !item.title) continue;
     const key = mangaKey(item.title);
     if (!key) continue;
@@ -37,7 +37,6 @@ function applyMangaDeletions(list = [], deletedManga = {}) {
     const key = mangaKey(item.title);
     const deletedAt = deletedManga[key];
     if (!deletedAt) return true;
-    // Re-add/save after delete wins when updatedAt is newer than the tombstone.
     return (item.updatedAt || 0) > deletedAt;
   });
 }
@@ -56,45 +55,17 @@ function clearTombsForPresentManga(deletedManga = {}, mangaList = []) {
 }
 
 async function getTrackerStorage() {
-  let syncData = {};
   let localData = {};
-
-  try {
-    syncData = await browser.storage.sync.get(STORAGE_KEYS);
-  } catch (_e) {
-    syncData = {};
-  }
-
   try {
     localData = await browser.storage.local.get(STORAGE_KEYS);
   } catch (_e) {
     localData = {};
   }
 
-  // Local is canonical so clears/deletes stick. Sync is only a fallback mirror.
-  const hasLocalManga = Object.prototype.hasOwnProperty.call(localData, "mangaList");
-  const hasLocalSites = Object.prototype.hasOwnProperty.call(localData, "allowedSites");
-  const hasLocalDeleted = Object.prototype.hasOwnProperty.call(
-    localData,
-    "deletedManga"
-  );
-
-  const deletedManga = hasLocalDeleted
-    ? localData.deletedManga || {}
-    : syncData.deletedManga || {};
-
-  const rawList = hasLocalManga
-    ? localData.mangaList || []
-    : syncData.mangaList || [];
-
-  const mangaList = applyMangaDeletions(rawList, deletedManga);
-
-  const allowedSites = hasLocalSites
-    ? localData.allowedSites || []
-    : syncData.allowedSites || [];
-
-  const dataUpdatedAt =
-    localData.dataUpdatedAt || syncData.dataUpdatedAt || 0;
+  const deletedManga = localData.deletedManga || {};
+  const mangaList = applyMangaDeletions(localData.mangaList || [], deletedManga);
+  const allowedSites = localData.allowedSites || [];
+  const dataUpdatedAt = localData.dataUpdatedAt || 0;
 
   return { mangaList, allowedSites, deletedManga, dataUpdatedAt };
 }
@@ -130,11 +101,5 @@ async function setTrackerStorage(data) {
     patch.dataUpdatedAt = Date.now();
   }
 
-  try {
-    await browser.storage.local.set(patch);
-  } catch (_e) {
-    // ignore
-  }
-  // Mirror to sync in background — don't block the UI on it.
-  browser.storage.sync.set(patch).catch(() => {});
+  await browser.storage.local.set(patch);
 }
