@@ -392,8 +392,9 @@ function handleSyncResult(result, animeCount) {
     setStatusMsg(result.error, true);
   } else if (result && result.skipped && result.reason) {
     setStatusMsg(
-      result.reason === "missing token or gist id"
-        ? "Set token + Gist ID in Settings"
+      result.reason === "missing token" ||
+        result.reason === "missing token or gist id"
+        ? "Set GitHub token in Settings (Gist ID optional on first sync)"
         : "Sync skipped",
       true
     );

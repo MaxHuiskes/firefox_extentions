@@ -70,7 +70,11 @@ async function waitForGistIdle(timeoutMs = 30000) {
 
 async function runGistJob(mode, options = {}) {
   const { token, gistId } = await getGistSettings();
-  if (!token || !gistId) {
+  if (!token) {
+    return { skipped: true, reason: "missing token" };
+  }
+  // Push updates an existing gist; create happens via merge with empty gistId.
+  if (!gistId && mode === "push") {
     return { skipped: true, reason: "missing token or gist id" };
   }
 
@@ -112,11 +116,25 @@ async function forcePullThenPush(options = {}) {
   const skipConflictCheck = Boolean(options.skipConflictCheck);
 
   const { token, gistId } = await getGistSettings();
-  if (!token || !gistId) {
+  if (!token) {
     return {
       skipped: true,
-      reason: "missing token or gist id",
-      error: "Set token + Gist ID in Settings",
+      reason: "missing token",
+      error: "Set GitHub token in Settings",
+    };
+  }
+
+  // First-time setup: token only → create a new private gist, then done.
+  if (!gistId) {
+    const created = await runGistJob("merge", { force: true });
+    return {
+      skipped: Boolean(created.skipped && !created.error),
+      error: created.error || "",
+      changed: true,
+      created: true,
+      mangaCount: created.mangaCount || 0,
+      gistId: created.gistId || "",
+      resolution: "create",
     };
   }
 
