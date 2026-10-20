@@ -216,6 +216,151 @@ function snapshotHash(animeList, allowedSites, deletedAnime, ignoredSites) {
   });
 }
 
+function remoteSnapshotHash(remote) {
+  if (!remote) return "";
+  return snapshotHash(
+    remote.animeList || [],
+    remote.allowedSites || [],
+    remote.deletedAnime || {},
+    remote.ignoredSites || []
+  );
+}
+
+function summarizeConflictDiff(localList = [], remoteList = []) {
+  const localKeys = new Map(
+    (localList || [])
+      .filter((i) => i && i.title)
+      .map((i) => [animeKey(i.title), i])
+  );
+  const remoteKeys = new Map(
+    (remoteList || [])
+      .filter((i) => i && i.title)
+      .map((i) => [animeKey(i.title), i])
+  );
+
+  const onlyLocal = [];
+  const onlyRemote = [];
+  const chapterDiff = [];
+
+  for (const [key, item] of localKeys) {
+    if (!remoteKeys.has(key)) {
+      onlyLocal.push(item.title);
+    } else {
+      const remote = remoteKeys.get(key);
+      if (String(item.episode || "") !== String(remote.episode || "")) {
+        chapterDiff.push({
+          title: item.title,
+          local: item.episode || "?",
+          remote: remote.episode || "?",
+        });
+      }
+    }
+  }
+  for (const [key, item] of remoteKeys) {
+    if (!localKeys.has(key)) onlyRemote.push(item.title);
+  }
+
+  return {
+    onlyLocal: onlyLocal.slice(0, 5),
+    onlyRemote: onlyRemote.slice(0, 5),
+    chapterDiff: chapterDiff.slice(0, 5),
+    onlyLocalCount: onlyLocal.length,
+    onlyRemoteCount: onlyRemote.length,
+    chapterDiffCount: chapterDiff.length,
+  };
+}
+
+async function inspectGistConflict() {
+  const { token, gistId } = await getGistSettings();
+  if (!token || !gistId) {
+    return {
+      conflict: false,
+      skipped: true,
+      reason: "missing token or gist id",
+    };
+  }
+
+  await assertNotRateLimited();
+  const local = await getTrackerStorage();
+  const localHash = snapshotHash(
+    local.animeList,
+    local.allowedSites,
+    local.deletedAnime,
+    local.ignoredSites
+  );
+
+  const { lastGistPushHash = "" } = await browser.storage.local.get(
+    "lastGistPushHash"
+  );
+
+  let remote = null;
+  try {
+    remote = await downloadGistBackup(token, gistId);
+  } catch (err) {
+    if (
+      String(err.message).includes("Not Found") ||
+      String(err.message).includes("404")
+    ) {
+      return {
+        conflict: false,
+        hadRemote: false,
+        localCount: local.animeList.length,
+      };
+    }
+    throw err;
+  }
+
+  if (!remote) {
+    return {
+      conflict: false,
+      hadRemote: false,
+      localCount: local.animeList.length,
+    };
+  }
+
+  const remoteHash = remoteSnapshotHash(remote);
+  const diverged = localHash !== remoteHash;
+  const localChanged = !lastGistPushHash || localHash !== lastGistPushHash;
+  const remoteChanged = !lastGistPushHash || remoteHash !== lastGistPushHash;
+  const conflict = Boolean(
+    diverged && localChanged && remoteChanged && lastGistPushHash
+  );
+
+  const remoteUpdatedAt = remote?.dataUpdatedAt
+    ? Number(remote.dataUpdatedAt)
+    : remote?.exportedAt
+      ? Date.parse(remote.exportedAt) || 0
+      : 0;
+
+  return {
+    conflict,
+    hadRemote: true,
+    localCount: (local.animeList || []).length,
+    remoteCount: Array.isArray(remote.animeList) ? remote.animeList.length : 0,
+    localUpdatedAt: local.dataUpdatedAt || 0,
+    remoteUpdatedAt,
+    diff: summarizeConflictDiff(local.animeList, remote.animeList || []),
+  };
+}
+
+async function applyRemoteOverwrite(remote) {
+  const animeList = applyAnimeDeletions(
+    Array.isArray(remote?.animeList) ? remote.animeList : [],
+    remote?.deletedAnime || {}
+  );
+  await setTrackerStorage({
+    animeList,
+    allowedSites: Array.isArray(remote?.allowedSites)
+      ? remote.allowedSites
+      : [],
+    ignoredSites: Array.isArray(remote?.ignoredSites)
+      ? remote.ignoredSites
+      : [],
+    deletedAnime: remote?.deletedAnime || {},
+    dataUpdatedAt: Date.now(),
+  });
+}
+
 async function syncWithGithubGist(options = {}) {
   const mode = options.mode || "merge";
   const { token, gistId } = await getGistSettings();

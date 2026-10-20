@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Anime Progress Tracker",
-  "version": "1.2.0",
-  "description": "Track anime progress. Manual GitHub Gist sync or export/import between desktop and Android.",
+  "version": "1.0.0",
+  "description": "Track anime progress. Sync via GitHub Gist, JSON backup, or MyAnimeList XML import/export.",
   "permissions": [
     "storage",
     "activeTab",

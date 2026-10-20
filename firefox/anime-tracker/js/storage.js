@@ -8,7 +8,7 @@ const STORAGE_KEYS = [
   "dailyAutoSync",
 ];
 
-const STATUSES = ["watching", "hold", "dropped", "finished"];
+const STATUSES = ["watching", "hold", "dropped", "finished", "plantowatch"];
 
 function animeKey(title) {
   return String(title || "")
@@ -17,31 +17,130 @@ function animeKey(title) {
 }
 
 function normalizeStatus(status) {
-  const s = String(status || "watching").toLowerCase();
-  if (s === "reading") return "watching";
+  const s = String(status || "watching").toLowerCase().replace(/[\s_-]/g, "");
+  if (s === "reading" || s === "watch") return "watching";
+  if (s === "completed" || s === "complete") return "finished";
+  if (s === "onhold" || s === "paused") return "hold";
+  if (s === "plantowatch" || s === "ptw" || s === "plan") return "plantowatch";
   return STATUSES.includes(s) ? s : "watching";
+}
+
+function normalizeTags(tags) {
+  const raw = Array.isArray(tags)
+    ? tags
+    : typeof tags === "string"
+      ? tags.split(",")
+      : [];
+  const out = [];
+  const seen = new Set();
+  for (const t of raw) {
+    const tag = String(t || "").trim();
+    if (!tag) continue;
+    const key = tag.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(tag);
+  }
+  return out;
+}
+
+function episodeNum(episode) {
+  const n = parseFloat(String(episode || "").replace(/,/g, "."));
+  return Number.isFinite(n) ? n : 0;
+}
+
+function normalizeAnimeItem(item) {
+  if (!item || !item.title) return null;
+  return {
+    ...item,
+    status: normalizeStatus(item.status),
+    episode: item.episode ?? item.chapter ?? "",
+    favorite: Boolean(item.favorite),
+    tags: normalizeTags(item.tags),
+    malId: item.malId ? String(item.malId) : item.malId || "",
+    score: item.score != null && item.score !== "" ? Number(item.score) || 0 : 0,
+  };
+}
+
+function mergeAnimeEntries(a, b, preferredTitle) {
+  const left = normalizeAnimeItem(a) || { title: "", tags: [] };
+  const right = normalizeAnimeItem(b) || { title: "", tags: [] };
+  const leftEp = episodeNum(left.episode);
+  const rightEp = episodeNum(right.episode);
+  const progress =
+    leftEp > rightEp
+      ? left
+      : rightEp > leftEp
+        ? right
+        : (left.updatedAt || 0) >= (right.updatedAt || 0)
+          ? left
+          : right;
+  const other = progress === left ? right : left;
+  const newer =
+    (left.updatedAt || 0) >= (right.updatedAt || 0) ? left : right;
+
+  return normalizeAnimeItem({
+    ...other,
+    ...progress,
+    title: preferredTitle || progress.title || other.title,
+    url: progress.url || other.url,
+    episode: progress.episode || other.episode,
+    cover: progress.cover || other.cover,
+    malId: progress.malId || other.malId,
+    score: Math.max(Number(left.score) || 0, Number(right.score) || 0),
+    status: newer.status,
+    favorite: Boolean(left.favorite || right.favorite),
+    tags: normalizeTags([...(left.tags || []), ...(right.tags || [])]),
+    updatedAt: Math.max(left.updatedAt || 0, right.updatedAt || 0, Date.now()),
+  });
 }
 
 function mergeAnimeLists(a = [], b = []) {
   const byKey = new Map();
 
   for (const item of [...a, ...b]) {
-    if (!item || !item.title) continue;
-    const key = animeKey(item.title);
+    const next = normalizeAnimeItem(item);
+    if (!next) continue;
+    const key = animeKey(next.title);
     if (!key) continue;
     const prev = byKey.get(key);
-    const next = {
-      ...item,
-      status: normalizeStatus(item.status),
-      episode: item.episode ?? item.chapter ?? "",
-    };
-    if (!prev || (item.updatedAt || 0) >= (prev.updatedAt || 0)) {
-      byKey.set(key, { ...prev, ...next });
+    if (!prev) {
+      byKey.set(key, next);
+      continue;
     }
+    byKey.set(key, mergeAnimeEntries(prev, next, prev.title));
   }
 
-  return Array.from(byKey.values()).sort(
-    (x, y) => (y.updatedAt || 0) - (x.updatedAt || 0)
+  return Array.from(byKey.values()).sort((x, y) => {
+    if (Boolean(y.favorite) !== Boolean(x.favorite)) {
+      return y.favorite ? 1 : -1;
+    }
+    return (y.updatedAt || 0) - (x.updatedAt || 0);
+  });
+}
+
+function mergeDuplicateAnime(list, keepKey, dropKey, preferredTitle) {
+  const items = list || [];
+  const keep = items.find((item) => animeKey(item.title) === keepKey);
+  const drop = items.find((item) => animeKey(item.title) === dropKey);
+  if (!keep || !drop || keepKey === dropKey) return items.slice();
+
+  const merged = mergeAnimeEntries(keep, drop, preferredTitle || keep.title);
+  const next = items.filter(
+    (item) =>
+      animeKey(item.title) !== keepKey && animeKey(item.title) !== dropKey
+  );
+  next.unshift(merged);
+  return next;
+}
+
+function collectAllTags(animeList = []) {
+  const tags = new Set();
+  for (const item of animeList || []) {
+    for (const tag of normalizeTags(item.tags)) tags.add(tag);
+  }
+  return Array.from(tags).sort((a, b) =>
+    a.toLowerCase().localeCompare(b.toLowerCase())
   );
 }
 
@@ -121,14 +220,15 @@ async function getTrackerStorage() {
   }
 
   const deletedAnime = localData.deletedAnime || {};
-  const animeList = applyAnimeDeletions(
-    localData.animeList || [],
-    deletedAnime
-  ).map((item) => ({
-    ...item,
-    status: normalizeStatus(item.status),
-    episode: item.episode ?? item.chapter ?? "",
-  }));
+  const animeList = applyAnimeDeletions(localData.animeList || [], deletedAnime)
+    .map((item) => normalizeAnimeItem(item))
+    .filter(Boolean)
+    .sort((x, y) => {
+      if (Boolean(y.favorite) !== Boolean(x.favorite)) {
+        return y.favorite ? 1 : -1;
+      }
+      return (y.updatedAt || 0) - (x.updatedAt || 0);
+    });
 
   return {
     animeList,
@@ -162,21 +262,19 @@ async function setTrackerStorage(data) {
       delete deletedAnime[key];
     }
 
-    const mergedDeleted = clearTombsForPresentAnime(
-      mergeDeletedMaps(data.deletedAnime || {}, deletedAnime),
-      data.animeList
-    );
+    const normalized = data.animeList
+      .map((item) => normalizeAnimeItem(item))
+      .filter(Boolean);
 
     patch.animeList = applyAnimeDeletions(
-      data.animeList.map((item) => ({
-        ...item,
-        status: normalizeStatus(item.status),
-        episode: item.episode ?? item.chapter ?? "",
-      })),
-      mergedDeleted
+      normalized,
+      clearTombsForPresentAnime(
+        mergeDeletedMaps(data.deletedAnime || {}, deletedAnime),
+        normalized
+      )
     );
     patch.deletedAnime = clearTombsForPresentAnime(
-      mergedDeleted,
+      mergeDeletedMaps(data.deletedAnime || {}, deletedAnime),
       patch.animeList
     );
     patch.dataUpdatedAt = Date.now();

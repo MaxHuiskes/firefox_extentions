@@ -44,7 +44,7 @@ browser.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name !== DAILY_SYNC_ALARM) return;
   const { dailyAutoSync } = await getSettingsFlags();
   if (!dailyAutoSync) return;
-  await forcePullThenPush();
+  await forcePullThenPush({ resolution: "merge", skipConflictCheck: true });
   await refreshBadge();
 });
 
@@ -97,17 +97,70 @@ async function runGistJob(mode, options = {}) {
   }
 }
 
-async function forcePullThenPush() {
+async function forcePullThenPush(options = {}) {
+  const resolution = options.resolution || "";
+  const skipConflictCheck = Boolean(options.skipConflictCheck);
+
   const { token, gistId } = await getGistSettings();
   if (!token || !gistId) {
     return {
       skipped: true,
       reason: "missing token or gist id",
-      error: "Set token + Gist ID in Opties",
+      error: "Set token + Gist ID in Settings",
     };
   }
 
-  await browser.storage.local.remove("lastGistPushHash");
+  if (!skipConflictCheck && !resolution) {
+    try {
+      const inspection = await inspectGistConflict();
+      if (inspection.conflict) {
+        return { skipped: true, conflict: true, ...inspection };
+      }
+    } catch (err) {
+      return {
+        skipped: true,
+        error: err && err.message ? err.message : String(err),
+      };
+    }
+  }
+
+  if (resolution === "local") {
+    const push = await runGistJob("push", { force: true });
+    return {
+      skipped: Boolean(push.skipped && !push.error),
+      error: push.error || "",
+      changed: true,
+      animeCount: push.animeCount || 0,
+      gistId: push.gistId,
+      resolution: "local",
+      push,
+    };
+  }
+
+  if (resolution === "remote") {
+    try {
+      const remote = await downloadGistBackup(token, gistId);
+      if (!remote) {
+        return { skipped: true, error: "Remote Gist is empty" };
+      }
+      await applyRemoteOverwrite(remote);
+    } catch (err) {
+      return {
+        skipped: true,
+        error: err && err.message ? err.message : String(err),
+      };
+    }
+    const push = await runGistJob("push", { force: true });
+    return {
+      skipped: Boolean(push.skipped && !push.error),
+      error: push.error || "",
+      changed: true,
+      animeCount: push.animeCount || 0,
+      gistId: push.gistId,
+      resolution: "remote",
+      push,
+    };
+  }
 
   const pull = await runGistJob("pull", { force: true });
   if (pull.error) {
@@ -121,6 +174,7 @@ async function forcePullThenPush() {
     changed: true,
     animeCount: push.animeCount || pull.animeCount || 0,
     gistId: push.gistId || pull.gistId,
+    resolution: "merge",
     pull,
     push,
   };
@@ -130,7 +184,17 @@ browser.runtime.onMessage.addListener((message) => {
   if (!message || !message.action) return undefined;
 
   if (message.action === "forceGistSync") {
-    return forcePullThenPush();
+    return forcePullThenPush({
+      resolution: message.resolution || "",
+      skipConflictCheck: Boolean(message.skipConflictCheck),
+    });
+  }
+
+  if (message.action === "inspectGistConflict") {
+    return inspectGistConflict().catch((err) => ({
+      conflict: false,
+      error: err && err.message ? err.message : String(err),
+    }));
   }
 
   if (message.action === "refreshBadge") {

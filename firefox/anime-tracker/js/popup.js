@@ -50,7 +50,9 @@ function showPanel(name) {
       ? "Anime Bewerken"
       : "Anime Bewerken / Toevoegen";
 
-  if (onSettings) loadSettingsPanel();
+  if (onSettings) {
+    loadSettingsPanel();
+  }
 }
 
 function setSettingsStatus(id, text, isError = false) {
@@ -212,16 +214,21 @@ function filteredSortedList() {
   const q = document.getElementById("search").value.trim().toLowerCase();
   const statusFilter = document.getElementById("filter-status").value;
   const siteFilter = document.getElementById("filter-site").value;
+  const tagFilter = document.getElementById("filter-tag").value;
   const sort = document.getElementById("sort").value;
 
   let list = allAnime.slice();
 
   if (q) {
-    list = list.filter((item) =>
-      String(item.title || "").toLowerCase().includes(q)
-    );
+    list = list.filter((item) => {
+      const title = String(item.title || "").toLowerCase();
+      const tags = normalizeTags(item.tags).join(" ").toLowerCase();
+      return title.includes(q) || tags.includes(q);
+    });
   }
-  if (statusFilter !== "all") {
+  if (statusFilter === "favorites") {
+    list = list.filter((item) => Boolean(item.favorite));
+  } else if (statusFilter !== "all") {
     list = list.filter(
       (item) => normalizeStatus(item.status) === statusFilter
     );
@@ -229,9 +236,18 @@ function filteredSortedList() {
   if (siteFilter !== "all") {
     list = list.filter((item) => siteFromUrl(item.url) === siteFilter);
   }
+  if (tagFilter !== "all") {
+    const want = tagFilter.toLowerCase();
+    list = list.filter((item) =>
+      normalizeTags(item.tags).some((t) => t.toLowerCase() === want)
+    );
+  }
 
-  const statusOrder = { watching: 0, hold: 1, dropped: 2, finished: 3 };
+  const statusOrder = { watching: 0, hold: 1, dropped: 2, finished: 3, plantowatch: 4 };
   list.sort((a, b) => {
+    if (Boolean(b.favorite) !== Boolean(a.favorite)) {
+      return b.favorite ? 1 : -1;
+    }
     if (sort === "title") {
       return String(a.title || "").localeCompare(String(b.title || ""));
     }
@@ -278,6 +294,118 @@ function fillSiteFilter() {
   select.value = sites.includes(current) ? current : "all";
 }
 
+function fillTagFilter() {
+  const select = document.getElementById("filter-tag");
+  const current = select.value || "all";
+  const tags = collectAllTags(allAnime);
+
+  select.textContent = "";
+  const allOpt = document.createElement("option");
+  allOpt.value = "all";
+  allOpt.textContent = "All tags";
+  select.appendChild(allOpt);
+
+  for (const tag of tags) {
+    const opt = document.createElement("option");
+    opt.value = tag;
+    opt.textContent = tag;
+    select.appendChild(opt);
+  }
+  select.value = tags.includes(current) ? current : "all";
+}
+
+function updateBulkButtons() {
+  const n = selectedKeys.size;
+  document.getElementById("bulk-delete-btn").disabled = !selectMode || n === 0;
+  document.getElementById("bulk-merge-btn").disabled = !selectMode || n !== 2;
+}
+
+function hideConflictBar() {
+  document.getElementById("conflict-bar").classList.remove("show");
+  document.getElementById("conflict-details").textContent = "";
+  document.getElementById("conflict-summary").textContent = "";
+}
+
+function showConflictBar(result) {
+  const bar = document.getElementById("conflict-bar");
+  const summary = document.getElementById("conflict-summary");
+  const details = document.getElementById("conflict-details");
+  details.textContent = "";
+
+  const localWhen = result.localUpdatedAt
+    ? new Date(result.localUpdatedAt).toLocaleString()
+    : "?";
+  const remoteWhen = result.remoteUpdatedAt
+    ? new Date(result.remoteUpdatedAt).toLocaleString()
+    : "?";
+
+  summary.textContent = `Local ${result.localCount} ↔ Gist ${result.remoteCount}. Local updated ${localWhen}, Gist ${remoteWhen}. Both changed since last sync.`;
+
+  const diff = result.diff || {};
+  const lines = [];
+  if (diff.onlyLocalCount) {
+    lines.push(
+      `Only local (${diff.onlyLocalCount}): ${(diff.onlyLocal || []).join(", ")}`
+    );
+  }
+  if (diff.onlyRemoteCount) {
+    lines.push(
+      `Only Gist (${diff.onlyRemoteCount}): ${(diff.onlyRemote || []).join(", ")}`
+    );
+  }
+  for (const row of diff.progressDiff || []) {
+    lines.push(`${row.title}: local ep.${row.local} vs gist ep.${row.remote}`);
+  }
+  for (const line of lines) {
+    const li = document.createElement("li");
+    li.textContent = line;
+    details.appendChild(li);
+  }
+
+  bar.classList.add("show");
+}
+
+async function runGistSync(resolution = "") {
+  const result = await browser.runtime.sendMessage({
+    action: "forceGistSync",
+    resolution: resolution || undefined,
+  });
+
+  const { animeList = [] } = await getTrackerStorage();
+  allAnime = animeList;
+  fillSiteFilter();
+  fillTagFilter();
+  renderList();
+  await refreshSyncMeta();
+
+  return result;
+}
+
+function handleSyncResult(result, animeCount) {
+  if (result && result.conflict) {
+    showConflictBar(result);
+    setStatusMsg("Conflict — choose how to sync", true);
+    return;
+  }
+  hideConflictBar();
+  if (result && result.error) {
+    setStatusMsg(result.error, true);
+  } else if (result && result.skipped && result.reason) {
+    setStatusMsg(
+      result.reason === "missing token or gist id"
+        ? "Set token + Gist ID in Settings"
+        : "Sync skipped",
+      true
+    );
+  } else {
+    setStatusMsg(`✓ Synced (${result.animeCount || animeCount || 0})`);
+    setTimeout(() => {
+      const el = document.getElementById("status-msg");
+      if (el.textContent.startsWith("✓ Synced")) el.textContent = "";
+    }, 2000);
+  }
+}
+
 function showConfirm(text, onYes) {
   pendingConfirm = onYes;
   document.getElementById("confirm-text").textContent = text;
@@ -295,8 +423,7 @@ function setSelectMode(on) {
   document.getElementById("bulk-select-btn").textContent = on
     ? "Cancel select"
     : "Select";
-  document.getElementById("bulk-delete-btn").disabled =
-    !on || selectedKeys.size === 0;
+  updateBulkButtons();
   renderList();
 }
 
@@ -316,12 +443,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     try {
       const response = await browser.tabs.sendMessage(tab.id, {
-        action: "getAnimeDetails",
+        action: "getMangaDetails",
       });
       if (response && response.title) {
         document.getElementById("title").value = response.title;
         document.getElementById("url").value = response.url;
-        document.getElementById("episode").value = response.episode || "";
+        document.getElementById("episode").value = response.chapter || "";
         if (response.hostname) currentHostname = response.hostname;
       }
     } catch (_e) {
@@ -330,17 +457,21 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   fillSiteFilter();
+  fillTagFilter();
   renderList();
   refreshSyncMeta();
 
-  ["title", "url", "episode"].forEach((id) => {
+  ["title", "url", "chapter", "tags"].forEach((id) => {
     document.getElementById(id).addEventListener("input", triggerAutoSave);
   });
   document.getElementById("status").addEventListener("change", triggerAutoSave);
-  ["search", "sort", "filter-status", "filter-site"].forEach((id) => {
-    document.getElementById(id).addEventListener("input", renderList);
-    document.getElementById(id).addEventListener("change", renderList);
-  });
+  document.getElementById("favorite").addEventListener("change", triggerAutoSave);
+  ["search", "sort", "filter-status", "filter-site", "filter-tag"].forEach(
+    (id) => {
+      document.getElementById(id).addEventListener("input", renderList);
+      document.getElementById(id).addEventListener("change", renderList);
+    }
+  );
 });
 
 browser.storage.onChanged.addListener((changes, areaName) => {
@@ -348,9 +479,12 @@ browser.storage.onChanged.addListener((changes, areaName) => {
   if (changes.animeList) {
     allAnime = changes.animeList.newValue || [];
     fillSiteFilter();
+    fillTagFilter();
     renderList();
   }
-  if (changes.darkMode) applyDarkMode(changes.darkMode.newValue);
+  if (changes.darkMode) {
+    applyDarkMode(changes.darkMode.newValue);
+  }
   if (
     changes.lastGistSyncAt ||
     changes.lastGistSyncError ||
@@ -442,9 +576,16 @@ document.getElementById("gist-sync").addEventListener("click", async () => {
     }
     await refreshGistUi();
     await refreshSyncMeta();
+    if (result && result.conflict) {
+      showPanel("list");
+      showConflictBar(result);
+      setSettingsStatus("gist-status", "Conflict — choose in list view", true);
+      return;
+    }
     const storage = await getTrackerStorage();
     allAnime = storage.animeList || [];
     fillSiteFilter();
+    fillTagFilter();
     renderList();
     document.getElementById("sites").value = (storage.allowedSites || []).join(
       ", "
@@ -543,6 +684,7 @@ async function importFromText(raw) {
   if (next.animeList) {
     allAnime = next.animeList;
     fillSiteFilter();
+    fillTagFilter();
     renderList();
   }
   setSettingsStatus(
@@ -554,10 +696,28 @@ async function importFromText(raw) {
 document.getElementById("import-btn").addEventListener("click", async () => {
   const raw = document.getElementById("transfer-data").value.trim();
   if (!raw) {
-    setSettingsStatus("transfer-status", "Paste JSON first", true);
+    setSettingsStatus("transfer-status", "Paste JSON or MAL XML first", true);
     return;
   }
   try {
+    if (isMalXml(raw)) {
+      const parsed = parseMalAnimeXml(raw);
+      const current = await getTrackerStorage();
+      const merged = mergeAnimeLists(
+        current.animeList || [],
+        parsed.animeList || []
+      );
+      await setTrackerStorage({ animeList: merged });
+      allAnime = merged;
+      fillSiteFilter();
+      fillTagFilter();
+      renderList();
+      setSettingsStatus(
+        "transfer-status",
+        `✓ MAL import ${parsed.animeList.length} → ${merged.length} total`
+      );
+      return;
+    }
     await importFromText(raw);
   } catch (err) {
     setSettingsStatus("transfer-status", err.message || String(err), true);
@@ -594,9 +754,37 @@ document.getElementById("bulk-delete-btn").addEventListener("click", () => {
     await setTrackerStorage({ animeList: next });
     setSelectMode(false);
     fillSiteFilter();
+    fillTagFilter();
     renderList();
     setStatusMsg("✓ Deleted");
   });
+});
+
+document.getElementById("bulk-merge-btn").addEventListener("click", () => {
+  if (selectedKeys.size !== 2) return;
+  const keys = Array.from(selectedKeys);
+  const a = allAnime.find((item) => animeKey(item.title) === keys[0]);
+  const b = allAnime.find((item) => animeKey(item.title) === keys[1]);
+  if (!a || !b) return;
+
+  showConfirm(
+    `Merge into "${a.title}"? (keeps higher episode, combines tags)`,
+    async () => {
+      const next = mergeDuplicateAnime(
+        allAnime,
+        keys[0],
+        keys[1],
+        a.title
+      );
+      allAnime = next;
+      await setTrackerStorage({ animeList: next });
+      setSelectMode(false);
+      fillSiteFilter();
+      fillTagFilter();
+      renderList();
+      setStatusMsg(`✓ Merged → ${a.title}`);
+    }
+  );
 });
 
 document.getElementById("confirm-yes").addEventListener("click", async () => {
@@ -606,6 +794,30 @@ document.getElementById("confirm-yes").addEventListener("click", async () => {
 });
 
 document.getElementById("confirm-no").addEventListener("click", hideConfirm);
+
+async function resolveConflict(resolution) {
+  setStatusMsg(`Syncing (${resolution})…`);
+  try {
+    const result = await runGistSync(resolution);
+    handleSyncResult(result, allAnime.length);
+  } catch (err) {
+    setStatusMsg(err.message || String(err), true);
+  }
+}
+
+document
+  .getElementById("conflict-merge")
+  .addEventListener("click", () => resolveConflict("merge"));
+document
+  .getElementById("conflict-local")
+  .addEventListener("click", () => resolveConflict("local"));
+document
+  .getElementById("conflict-remote")
+  .addEventListener("click", () => resolveConflict("remote"));
+document.getElementById("conflict-cancel").addEventListener("click", () => {
+  hideConflictBar();
+  setStatusMsg("Sync cancelled");
+});
 
 document.getElementById("ignore-site-btn").addEventListener("click", async () => {
   if (!currentHostname) {
@@ -625,34 +837,12 @@ document.getElementById("ignore-site-btn").addEventListener("click", async () =>
 document.getElementById("gist-sync-btn").addEventListener("click", async () => {
   const btn = document.getElementById("gist-sync-btn");
   btn.disabled = true;
+  hideConflictBar();
   setStatusMsg("Syncing…");
 
   try {
-    const result = await browser.runtime.sendMessage({
-      action: "forceGistSync",
-    });
-    const { animeList = [] } = await getTrackerStorage();
-    allAnime = animeList;
-    fillSiteFilter();
-    renderList();
-    await refreshSyncMeta();
-
-    if (result && result.error) {
-      setStatusMsg(result.error, true);
-    } else if (result && result.skipped && result.reason) {
-      setStatusMsg(
-        result.reason === "missing token or gist id"
-          ? "Set token + Gist ID in Opties"
-          : "Sync skipped",
-        true
-      );
-    } else {
-      setStatusMsg(`✓ Synced (${result.animeCount || animeList.length})`);
-      setTimeout(() => {
-        const el = document.getElementById("status-msg");
-        if (el.textContent.startsWith("✓ Synced")) el.textContent = "";
-      }, 2000);
-    }
+    const result = await runGistSync("");
+    handleSyncResult(result, allAnime.length);
   } catch (err) {
     setStatusMsg(err.message || String(err), true);
   } finally {
@@ -665,7 +855,7 @@ function triggerAutoSave() {
   setStatusMsg("Aan het typen...");
 
   saveTimeout = setTimeout(async () => {
-    await saveAnimeData();
+    await saveMangaData();
     setStatusMsg("✓ Automatisch opgeslagen");
     setTimeout(() => {
       const el = document.getElementById("status-msg");
@@ -674,11 +864,13 @@ function triggerAutoSave() {
   }, 500);
 }
 
-async function saveAnimeData() {
+async function saveMangaData() {
   const title = document.getElementById("title").value.trim();
   const url = document.getElementById("url").value.trim();
-  const episode = document.getElementById("episode").value.trim();
+  const chapter = document.getElementById("episode").value.trim();
   const status = normalizeStatus(document.getElementById("status").value);
+  const tags = normalizeTags(document.getElementById("tags").value);
+  const favorite = document.getElementById("favorite").checked;
 
   if (!title || !url) return;
 
@@ -686,8 +878,10 @@ async function saveAnimeData() {
   const newEntry = {
     title,
     url,
-    episode,
+    chapter,
     status,
+    tags,
+    favorite,
     updatedAt: Date.now(),
   };
 
@@ -709,6 +903,7 @@ async function saveAnimeData() {
   allAnime = list;
   await setTrackerStorage({ animeList: list });
   fillSiteFilter();
+  fillTagFilter();
   renderList();
 }
 
@@ -718,6 +913,7 @@ function renderList() {
   const list = filteredSortedList();
   document.getElementById("list-count").textContent =
     `${list.length}/${allAnime.length}`;
+  updateBulkButtons();
 
   if (list.length === 0) {
     const emptyLi = document.createElement("li");
@@ -746,8 +942,7 @@ function renderList() {
       check.addEventListener("change", () => {
         if (check.checked) selectedKeys.add(key);
         else selectedKeys.delete(key);
-        document.getElementById("bulk-delete-btn").disabled =
-          selectedKeys.size === 0;
+        updateBulkButtons();
       });
       li.appendChild(check);
     }
@@ -783,7 +978,15 @@ function renderList() {
     link.target = "_blank";
     link.title = item.title;
     const strong = document.createElement("strong");
-    strong.textContent = truncateTitle(item.title, maxLen);
+    if (item.favorite) {
+      const star = document.createElement("span");
+      star.className = "fav-star";
+      star.textContent = "★ ";
+      strong.appendChild(star);
+    }
+    strong.appendChild(
+      document.createTextNode(truncateTitle(item.title, maxLen))
+    );
     link.appendChild(strong);
     info.appendChild(link);
 
@@ -803,6 +1006,19 @@ function renderList() {
       meta.appendChild(next);
     }
     info.appendChild(meta);
+
+    const tags = normalizeTags(item.tags);
+    if (tags.length) {
+      const tagRow = document.createElement("div");
+      tagRow.className = "tag-row";
+      for (const tag of tags) {
+        const chip = document.createElement("span");
+        chip.className = "tag-chip";
+        chip.textContent = tag;
+        tagRow.appendChild(chip);
+      }
+      info.appendChild(tagRow);
+    }
 
     const statusSelect = document.createElement("select");
     statusSelect.className = "status-select";
@@ -828,6 +1044,21 @@ function renderList() {
     const actions = document.createElement("div");
     actions.className = "actions";
 
+    const pinBtn = document.createElement("button");
+    pinBtn.className = "icon-btn";
+    pinBtn.textContent = item.favorite ? "★" : "☆";
+    pinBtn.title = item.favorite ? "Unpin" : "Favorite";
+    pinBtn.onclick = async () => {
+      if (realIndex < 0) return;
+      allAnime[realIndex] = {
+        ...allAnime[realIndex],
+        favorite: !allAnime[realIndex].favorite,
+        updatedAt: Date.now(),
+      };
+      await setTrackerStorage({ animeList: allAnime });
+      renderList();
+    };
+
     const editBtn = document.createElement("button");
     editBtn.className = "icon-btn";
     editBtn.textContent = "✏️";
@@ -838,6 +1069,10 @@ function renderList() {
       document.getElementById("url").value = item.url;
       document.getElementById("episode").value = item.episode || "";
       document.getElementById("status").value = normalizeStatus(item.status);
+      document.getElementById("tags").value = normalizeTags(item.tags).join(
+        ", "
+      );
+      document.getElementById("favorite").checked = Boolean(item.favorite);
       document.getElementById("form-title").textContent = "Anime Bewerken";
     };
 
@@ -851,11 +1086,13 @@ function renderList() {
         allAnime.splice(realIndex, 1);
         await setTrackerStorage({ animeList: allAnime });
         fillSiteFilter();
+        fillTagFilter();
         renderList();
         setStatusMsg("✓ Deleted");
       });
     };
 
+    actions.appendChild(pinBtn);
     actions.appendChild(editBtn);
     actions.appendChild(delBtn);
     li.appendChild(info);
@@ -863,3 +1100,48 @@ function renderList() {
     ul.appendChild(li);
   });
 }
+
+
+document.getElementById("mal-export-btn").addEventListener("click", async () => {
+  try {
+    const { animeList = [] } = await getTrackerStorage();
+    const xml = buildMalAnimeXml(animeList);
+    const blob = new Blob([xml], { type: "application/xml" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `animelist-export-${new Date().toISOString().slice(0, 10)}.xml`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setSettingsStatus("mal-status", `✓ Exported ${animeList.length} anime (MAL XML)`);
+  } catch (err) {
+    setSettingsStatus("mal-status", err.message || String(err), true);
+  }
+});
+
+document.getElementById("mal-import-file").addEventListener("change", async (event) => {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    if (!isMalXml(text)) {
+      throw new Error("Not a MyAnimeList animelist XML file");
+    }
+    const parsed = parseMalAnimeXml(text);
+    const current = await getTrackerStorage();
+    const merged = mergeAnimeLists(current.animeList || [], parsed.animeList || []);
+    await setTrackerStorage({ animeList: merged });
+    allAnime = merged;
+    fillSiteFilter();
+    fillTagFilter();
+    renderList();
+    setSettingsStatus(
+      "mal-status",
+      `✓ Imported ${parsed.animeList.length} from MAL → ${merged.length} total`
+    );
+  } catch (err) {
+    setSettingsStatus("mal-status", err.message || String(err), true);
+  } finally {
+    event.target.value = "";
+  }
+});

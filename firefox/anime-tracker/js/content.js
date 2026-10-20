@@ -241,6 +241,10 @@ async function autoUpdateProgress() {
         status:
           normalizeStatus(prev.status) === "finished" ? "watching" : prev.status,
         cover: cover || prev.cover,
+        tags: prev.tags,
+        favorite: prev.favorite,
+        malId: prev.malId,
+        score: prev.score,
       };
       await setTrackerStorage({ animeList });
       showPageNotification(`✓ Voortgang opgeslagen: Ep. ${episode}`);
