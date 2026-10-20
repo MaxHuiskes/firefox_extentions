@@ -291,6 +291,8 @@ async function autoUpdateProgress() {
         ...newEntry,
         status: normalizeStatus(prev.status) === "finished" ? "reading" : prev.status,
         cover: cover || prev.cover,
+        tags: prev.tags,
+        favorite: prev.favorite,
       };
       await setTrackerStorage({ mangaList });
       showPageNotification(`✓ Voortgang opgeslagen: Ch. ${chapter}`);

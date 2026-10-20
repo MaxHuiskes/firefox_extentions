@@ -232,6 +232,143 @@ function snapshotHash(mangaList, allowedSites, deletedManga, ignoredSites) {
   });
 }
 
+function remoteSnapshotHash(remote) {
+  if (!remote) return "";
+  return snapshotHash(
+    remote.mangaList || [],
+    remote.allowedSites || [],
+    remote.deletedManga || {},
+    remote.ignoredSites || []
+  );
+}
+
+function summarizeConflictDiff(localList = [], remoteList = []) {
+  const localKeys = new Map(
+    (localList || [])
+      .filter((i) => i && i.title)
+      .map((i) => [mangaKey(i.title), i])
+  );
+  const remoteKeys = new Map(
+    (remoteList || [])
+      .filter((i) => i && i.title)
+      .map((i) => [mangaKey(i.title), i])
+  );
+
+  const onlyLocal = [];
+  const onlyRemote = [];
+  const chapterDiff = [];
+
+  for (const [key, item] of localKeys) {
+    if (!remoteKeys.has(key)) {
+      onlyLocal.push(item.title);
+    } else {
+      const remote = remoteKeys.get(key);
+      if (String(item.chapter || "") !== String(remote.chapter || "")) {
+        chapterDiff.push({
+          title: item.title,
+          local: item.chapter || "?",
+          remote: remote.chapter || "?",
+        });
+      }
+    }
+  }
+  for (const [key, item] of remoteKeys) {
+    if (!localKeys.has(key)) onlyRemote.push(item.title);
+  }
+
+  return {
+    onlyLocal: onlyLocal.slice(0, 5),
+    onlyRemote: onlyRemote.slice(0, 5),
+    chapterDiff: chapterDiff.slice(0, 5),
+    onlyLocalCount: onlyLocal.length,
+    onlyRemoteCount: onlyRemote.length,
+    chapterDiffCount: chapterDiff.length,
+  };
+}
+
+async function inspectGistConflict() {
+  const { token, gistId } = await getGistSettings();
+  if (!token || !gistId) {
+    return {
+      conflict: false,
+      skipped: true,
+      reason: "missing token or gist id",
+    };
+  }
+
+  await assertNotRateLimited();
+  const local = await getTrackerStorage();
+  const localHash = snapshotHash(
+    local.mangaList,
+    local.allowedSites,
+    local.deletedManga,
+    local.ignoredSites
+  );
+
+  const { lastGistPushHash = "" } = await browser.storage.local.get(
+    "lastGistPushHash"
+  );
+
+  let remote = null;
+  try {
+    remote = await downloadGistBackup(token, gistId);
+  } catch (err) {
+    if (
+      String(err.message).includes("Not Found") ||
+      String(err.message).includes("404")
+    ) {
+      return { conflict: false, hadRemote: false, localCount: local.mangaList.length };
+    }
+    throw err;
+  }
+
+  if (!remote) {
+    return { conflict: false, hadRemote: false, localCount: local.mangaList.length };
+  }
+
+  const remoteHash = remoteSnapshotHash(remote);
+  const diverged = localHash !== remoteHash;
+  const localChanged = !lastGistPushHash || localHash !== lastGistPushHash;
+  const remoteChanged = !lastGistPushHash || remoteHash !== lastGistPushHash;
+  const conflict = Boolean(
+    diverged && localChanged && remoteChanged && lastGistPushHash
+  );
+
+  const remoteUpdatedAt = remote?.dataUpdatedAt
+    ? Number(remote.dataUpdatedAt)
+    : remote?.exportedAt
+      ? Date.parse(remote.exportedAt) || 0
+      : 0;
+
+  return {
+    conflict,
+    hadRemote: true,
+    localCount: (local.mangaList || []).length,
+    remoteCount: Array.isArray(remote.mangaList) ? remote.mangaList.length : 0,
+    localUpdatedAt: local.dataUpdatedAt || 0,
+    remoteUpdatedAt,
+    diff: summarizeConflictDiff(local.mangaList, remote.mangaList || []),
+  };
+}
+
+async function applyRemoteOverwrite(remote) {
+  const mangaList = applyMangaDeletions(
+    Array.isArray(remote?.mangaList) ? remote.mangaList : [],
+    remote?.deletedManga || {}
+  );
+  await setTrackerStorage({
+    mangaList,
+    allowedSites: Array.isArray(remote?.allowedSites)
+      ? remote.allowedSites
+      : [],
+    ignoredSites: Array.isArray(remote?.ignoredSites)
+      ? remote.ignoredSites
+      : [],
+    deletedManga: remote?.deletedManga || {},
+    dataUpdatedAt: Date.now(),
+  });
+}
+
 async function syncWithGithubGist(options = {}) {
   const mode = options.mode || "merge";
   const { token, gistId } = await getGistSettings();

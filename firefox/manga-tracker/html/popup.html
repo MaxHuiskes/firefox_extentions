@@ -315,6 +315,64 @@
     .confirm-bar.show { display: flex; }
     .confirm-bar span { flex: 1; min-width: 120px; }
 
+    .conflict-bar {
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 10px;
+      padding: 10px;
+      background: #fff8e1;
+      border: 1px solid #f0c36d;
+      border-radius: 8px;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    body.dark .conflict-bar {
+      background: #3c3420;
+      border-color: #8a6d1d;
+    }
+    .conflict-bar.show { display: flex; }
+    .conflict-bar .conflict-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .conflict-bar ul {
+      max-height: none;
+      margin: 4px 0 0;
+      padding-left: 16px;
+      list-style: disc;
+    }
+    .conflict-bar li {
+      display: list-item;
+      padding: 2px 0;
+      border: none;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .tag-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+    .tag-chip {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #e8f0fe;
+      color: #1967d2;
+    }
+    body.dark .tag-chip {
+      background: #394457;
+      color: #8ab4f8;
+    }
+    .fav-star {
+      color: #f4b400;
+      margin-right: 2px;
+    }
+
     .panel { display: none; }
     .panel.active { display: block; }
 
@@ -486,6 +544,13 @@
         <option value="finished">Finished</option>
       </select>
     </div>
+    <div class="row-2">
+      <input type="text" id="tags" placeholder="Tags (comma-separated)" autocomplete="off">
+      <label class="toggle-row" style="margin:0;padding-top:6px;">
+        <input type="checkbox" id="favorite">
+        Favorite
+      </label>
+    </div>
 
     <div class="top-actions">
       <div id="status-msg" class="status-msg"></div>
@@ -513,14 +578,22 @@
         <option value="hold">On hold</option>
         <option value="dropped">Dropped</option>
         <option value="finished">Finished</option>
+        <option value="favorites">★ Favorites</option>
       </select>
       <select id="filter-site">
         <option value="all">All sites</option>
       </select>
     </div>
+    <div class="filters">
+      <select id="filter-tag">
+        <option value="all">All tags</option>
+      </select>
+      <span></span>
+    </div>
 
     <div class="toolbar">
       <button id="bulk-select-btn" class="secondary-btn" type="button">Select</button>
+      <button id="bulk-merge-btn" class="secondary-btn" type="button" disabled>Merge 2</button>
       <button id="bulk-delete-btn" class="danger-btn" type="button" disabled>Delete selected</button>
       <button id="ignore-site-btn" class="secondary-btn" type="button" title="Ignore current site">Ignore site</button>
       <div id="sync-meta" class="sync-meta"></div>
@@ -530,6 +603,18 @@
       <span id="confirm-text"></span>
       <button id="confirm-yes" class="danger-btn" type="button">Confirm</button>
       <button id="confirm-no" class="secondary-btn" type="button">Cancel</button>
+    </div>
+
+    <div id="conflict-bar" class="conflict-bar">
+      <strong>Sync conflict</strong>
+      <div id="conflict-summary"></div>
+      <ul id="conflict-details"></ul>
+      <div class="conflict-actions">
+        <button id="conflict-merge" class="primary-btn" type="button">Merge both</button>
+        <button id="conflict-local" class="secondary-btn" type="button">Keep mine</button>
+        <button id="conflict-remote" class="secondary-btn" type="button">Keep Gist</button>
+        <button id="conflict-cancel" class="secondary-btn" type="button">Cancel</button>
+      </div>
     </div>
 
     <ul id="manga-list"></ul>

@@ -21,25 +21,126 @@ function normalizeStatus(status) {
   return STATUSES.includes(s) ? s : "reading";
 }
 
+function normalizeTags(tags) {
+  const raw = Array.isArray(tags)
+    ? tags
+    : typeof tags === "string"
+      ? tags.split(",")
+      : [];
+  const out = [];
+  const seen = new Set();
+  for (const t of raw) {
+    const tag = String(t || "").trim();
+    if (!tag) continue;
+    const key = tag.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(tag);
+  }
+  return out;
+}
+
+function chapterNum(chapter) {
+  const n = parseFloat(String(chapter || "").replace(/,/g, "."));
+  return Number.isFinite(n) ? n : 0;
+}
+
+function normalizeMangaItem(item) {
+  if (!item || !item.title) return null;
+  return {
+    ...item,
+    status: normalizeStatus(item.status),
+    favorite: Boolean(item.favorite),
+    tags: normalizeTags(item.tags),
+  };
+}
+
+function mergeMangaEntries(a, b, preferredTitle) {
+  const left = normalizeMangaItem(a) || { title: "", tags: [] };
+  const right = normalizeMangaItem(b) || { title: "", tags: [] };
+  const leftCh = chapterNum(left.chapter);
+  const rightCh = chapterNum(right.chapter);
+  const progress =
+    leftCh > rightCh
+      ? left
+      : rightCh > leftCh
+        ? right
+        : (left.updatedAt || 0) >= (right.updatedAt || 0)
+          ? left
+          : right;
+  const other = progress === left ? right : left;
+  const newer =
+    (left.updatedAt || 0) >= (right.updatedAt || 0) ? left : right;
+
+  return normalizeMangaItem({
+    ...other,
+    ...progress,
+    title: preferredTitle || progress.title || other.title,
+    url: progress.url || other.url,
+    chapter: progress.chapter || other.chapter,
+    cover: progress.cover || other.cover,
+    status: newer.status,
+    favorite: Boolean(left.favorite || right.favorite),
+    tags: normalizeTags([...(left.tags || []), ...(right.tags || [])]),
+    updatedAt: Math.max(left.updatedAt || 0, right.updatedAt || 0, Date.now()),
+  });
+}
+
 function mergeMangaLists(a = [], b = []) {
   const byKey = new Map();
 
   for (const item of [...a, ...b]) {
-    if (!item || !item.title) continue;
-    const key = mangaKey(item.title);
+    const next = normalizeMangaItem(item);
+    if (!next) continue;
+    const key = mangaKey(next.title);
     if (!key) continue;
     const prev = byKey.get(key);
-    const next = {
-      ...item,
-      status: normalizeStatus(item.status),
-    };
-    if (!prev || (item.updatedAt || 0) >= (prev.updatedAt || 0)) {
-      byKey.set(key, { ...prev, ...next });
+    if (!prev) {
+      byKey.set(key, next);
+      continue;
     }
+    byKey.set(key, mergeMangaEntries(prev, next, prev.title));
   }
 
-  return Array.from(byKey.values()).sort(
-    (x, y) => (y.updatedAt || 0) - (x.updatedAt || 0)
+  return Array.from(byKey.values()).sort((x, y) => {
+    if (Boolean(y.favorite) !== Boolean(x.favorite)) {
+      return y.favorite ? 1 : -1;
+    }
+    return (y.updatedAt || 0) - (x.updatedAt || 0);
+  });
+}
+
+/** Merge two different titles into one entry; remove the other. */
+function mergeDuplicateManga(list, keepKey, dropKey, preferredTitle) {
+  const items = list || [];
+  const keep = items.find((item) => mangaKey(item.title) === keepKey);
+  const drop = items.find((item) => mangaKey(item.title) === dropKey);
+  if (!keep || !drop || keepKey === dropKey) {
+    return items.slice();
+  }
+
+  const merged = mergeMangaEntries(
+    keep,
+    drop,
+    preferredTitle || keep.title
+  );
+  const next = items.filter(
+    (item) =>
+      mangaKey(item.title) !== keepKey && mangaKey(item.title) !== dropKey
+  );
+  next.unshift(merged);
+  return next;
+}
+
+function collectAllTags(mangaList = []) {
+  const tags = new Set();
+  for (const item of mangaList || []) {
+    for (const tag of normalizeTags(item.tags)) {
+      tags.add(tag);
+    }
+  }
+  return Array.from(tags).sort((a, b) =>
+    a.toLowerCase().localeCompare(b.toLowerCase())
   );
 }
 
@@ -78,7 +179,6 @@ function nextChapterUrl(url, chapter) {
   const ch = String(chapter || "").trim();
   if (!ch) return "";
 
-  // chapter-12 or chapter-12-5 in path
   const pathMatch = url.match(/chapter-(\d+(?:[.-]\d+)*)/i);
   if (pathMatch) {
     const raw = pathMatch[1];
@@ -90,7 +190,6 @@ function nextChapterUrl(url, chapter) {
     return url.replace(/chapter-\d+(?:[.-]\d+)*/i, `chapter-${next}`);
   }
 
-  // /ch/12 or ?chapter=12
   const chPath = url.match(/\/ch\/(\d+)/i);
   if (chPath) {
     const n = Number(chPath[1]) + 1;
@@ -127,10 +226,15 @@ async function getTrackerStorage() {
   const mangaList = applyMangaDeletions(
     localData.mangaList || [],
     deletedManga
-  ).map((item) => ({
-    ...item,
-    status: normalizeStatus(item.status),
-  }));
+  )
+    .map((item) => normalizeMangaItem(item))
+    .filter(Boolean)
+    .sort((x, y) => {
+      if (Boolean(y.favorite) !== Boolean(x.favorite)) {
+        return y.favorite ? 1 : -1;
+      }
+      return (y.updatedAt || 0) - (x.updatedAt || 0);
+    });
 
   return {
     mangaList,
@@ -164,14 +268,15 @@ async function setTrackerStorage(data) {
       delete deletedManga[key];
     }
 
+    const normalized = data.mangaList
+      .map((item) => normalizeMangaItem(item))
+      .filter(Boolean);
+
     patch.mangaList = applyMangaDeletions(
-      data.mangaList.map((item) => ({
-        ...item,
-        status: normalizeStatus(item.status),
-      })),
+      normalized,
       clearTombsForPresentManga(
         mergeDeletedMaps(data.deletedManga || {}, deletedManga),
-        data.mangaList
+        normalized
       )
     );
     patch.deletedManga = clearTombsForPresentManga(

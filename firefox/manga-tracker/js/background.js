@@ -48,7 +48,8 @@ browser.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name !== DAILY_SYNC_ALARM) return;
   const { dailyAutoSync } = await getSettingsFlags();
   if (!dailyAutoSync) return;
-  await forcePullThenPush();
+  // Auto sync always merges; no UI for conflicts.
+  await forcePullThenPush({ resolution: "merge", skipConflictCheck: true });
   await refreshBadge();
 });
 
@@ -103,18 +104,81 @@ async function runGistJob(mode, options = {}) {
   }
 }
 
-async function forcePullThenPush() {
+/**
+ * @param {{ resolution?: "merge"|"local"|"remote", skipConflictCheck?: boolean }} options
+ */
+async function forcePullThenPush(options = {}) {
+  const resolution = options.resolution || "";
+  const skipConflictCheck = Boolean(options.skipConflictCheck);
+
   const { token, gistId } = await getGistSettings();
   if (!token || !gistId) {
     return {
       skipped: true,
       reason: "missing token or gist id",
-      error: "Set token + Gist ID in Opties",
+      error: "Set token + Gist ID in Settings",
     };
   }
 
-  await browser.storage.local.remove("lastGistPushHash");
+  if (!skipConflictCheck && !resolution) {
+    try {
+      const inspection = await inspectGistConflict();
+      if (inspection.conflict) {
+        return {
+          skipped: true,
+          conflict: true,
+          ...inspection,
+        };
+      }
+    } catch (err) {
+      return {
+        skipped: true,
+        error: err && err.message ? err.message : String(err),
+      };
+    }
+  }
 
+  if (resolution === "local") {
+    // Keep local — push over remote without pulling.
+    const push = await runGistJob("push", { force: true });
+    return {
+      skipped: Boolean(push.skipped && !push.error),
+      error: push.error || "",
+      changed: true,
+      mangaCount: push.mangaCount || 0,
+      gistId: push.gistId,
+      resolution: "local",
+      push,
+    };
+  }
+
+  if (resolution === "remote") {
+    // Keep remote — overwrite local, then push to align hash.
+    try {
+      const remote = await downloadGistBackup(token, gistId);
+      if (!remote) {
+        return { skipped: true, error: "Remote Gist is empty" };
+      }
+      await applyRemoteOverwrite(remote);
+    } catch (err) {
+      return {
+        skipped: true,
+        error: err && err.message ? err.message : String(err),
+      };
+    }
+    const push = await runGistJob("push", { force: true });
+    return {
+      skipped: Boolean(push.skipped && !push.error),
+      error: push.error || "",
+      changed: true,
+      mangaCount: push.mangaCount || 0,
+      gistId: push.gistId,
+      resolution: "remote",
+      push,
+    };
+  }
+
+  // merge (default): pull-merge then push
   const pull = await runGistJob("pull", { force: true });
   if (pull.error) {
     return { skipped: true, error: pull.error, pull, push: null };
@@ -127,6 +191,7 @@ async function forcePullThenPush() {
     changed: true,
     mangaCount: push.mangaCount || pull.mangaCount || 0,
     gistId: push.gistId || pull.gistId,
+    resolution: "merge",
     pull,
     push,
   };
@@ -136,7 +201,17 @@ browser.runtime.onMessage.addListener((message) => {
   if (!message || !message.action) return undefined;
 
   if (message.action === "forceGistSync") {
-    return forcePullThenPush();
+    return forcePullThenPush({
+      resolution: message.resolution || "",
+      skipConflictCheck: Boolean(message.skipConflictCheck),
+    });
+  }
+
+  if (message.action === "inspectGistConflict") {
+    return inspectGistConflict().catch((err) => ({
+      conflict: false,
+      error: err && err.message ? err.message : String(err),
+    }));
   }
 
   if (message.action === "refreshBadge") {
