@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Anime Tracker — Backup</title>
+  <style>
+    :root {
+      --text: #202124;
+      --muted: #5f6368;
+      --border: #dadce0;
+      --bg: #f9f9fb;
+      --card: #fff;
+      --primary: #0060df;
+    }
+    body.dark {
+      --text: #e8eaed;
+      --muted: #9aa0a6;
+      --border: #3c4043;
+      --bg: #202124;
+      --card: #292a2d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 24px 16px;
+      background: var(--bg);
+      color: var(--text);
+    }
+    h1 { font-size: 22px; margin: 0 0 8px; }
+    h2 { font-size: 17px; margin: 28px 0 8px; }
+    p { color: var(--muted); font-size: 14px; line-height: 1.45; }
+    .note {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 13px;
+      margin: 12px 0 20px;
+      line-height: 1.4;
+    }
+    textarea {
+      width: 100%;
+      height: 260px;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 13px;
+      background: var(--card);
+      color: var(--text);
+    }
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    button, .file-btn {
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-weight: 600;
+      font-size: 14px;
+      min-height: 44px;
+      background: var(--primary);
+      color: #fff;
+    }
+    button.secondary, .file-btn {
+      background: #e0e0e0;
+      color: #202124;
+    }
+    body.dark button.secondary, body.dark .file-btn {
+      background: #3c4043;
+      color: #e8eaed;
+    }
+    .file-btn {
+      display: inline-flex;
+      align-items: center;
+    }
+    .file-btn input { display: none; }
+    .status {
+      margin-top: 12px;
+      font-weight: 600;
+      font-size: 14px;
+      min-height: 20px;
+    }
+    .status.ok { color: #137333; }
+    body.dark .status.ok { color: #81c995; }
+    .status.err { color: #c5221f; }
+    body.dark .status.err { color: #f28b82; }
+    hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 28px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Export / Import</h1>
+  <p>This page stays open while Finder or the save dialog is open (the popup cannot).</p>
+  <div class="note">
+    JSON backup for this extension, or MyAnimeList <code>animelist_*.xml</code> import/export.
+  </div>
+  <textarea id="transfer-data" placeholder="JSON or paste MAL XML…" spellcheck="false"></textarea>
+  <div class="btn-row">
+    <button id="export-btn" type="button">Export JSON</button>
+    <button id="copy-btn" class="secondary" type="button">Copy</button>
+    <button id="download-btn" class="secondary" type="button">Download JSON</button>
+    <button id="import-btn" type="button">Import (merge)</button>
+    <label class="file-btn">
+      Load file
+      <input id="import-file" type="file" accept="application/json,.json,.xml,text/xml,text/plain">
+    </label>
+  </div>
+  <div id="status" class="status ok"></div>
+
+  <hr>
+  <h2>MyAnimeList XML</h2>
+  <p>Import your MAL export, or export MAL-compatible XML.</p>
+  <div class="btn-row">
+    <button id="mal-export-btn" type="button">Export MAL XML</button>
+    <label class="file-btn">
+      Import MAL XML
+      <input id="mal-import-file" type="file" accept=".xml,text/xml,application/xml">
+    </label>
+  </div>
+  <div id="mal-status" class="status ok"></div>
+
+  <script src="../js/storage.js"></script>
+  <script src="../js/mal.js"></script>
+  <script src="../js/backup.js"></script>
+</body>
+</html>

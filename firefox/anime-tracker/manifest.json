@@ -3,12 +3,18 @@
   "name": "Anime Progress Tracker",
   "version": "1.0.0",
   "description": "Track anime progress. Sync via GitHub Gist, JSON backup, or MyAnimeList XML import/export.",
+  "icons": {
+    "16": "images/icon.png",
+    "48": "images/icon.png",
+    "128": "images/icon.png"
+  },
   "permissions": [
     "storage",
     "activeTab",
     "tabs",
     "scripting",
-    "alarms"
+    "alarms",
+    "downloads"
   ],
   "host_permissions": [
     "<all_urls>",

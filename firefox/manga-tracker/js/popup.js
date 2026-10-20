@@ -617,111 +617,16 @@ document.getElementById("gist-clear").addEventListener("click", async () => {
   setSettingsStatus("gist-status", "GitHub sync cleared");
 });
 
-document.getElementById("export-btn").addEventListener("click", async () => {
+document.getElementById("open-backup-btn").addEventListener("click", async () => {
   try {
-    const {
-      mangaList = [],
-      allowedSites = [],
-      ignoredSites = [],
-    } = await getTrackerStorage();
-    document.getElementById("transfer-data").value = JSON.stringify(
-      buildExportPayload(mangaList, allowedSites, ignoredSites),
-      null,
-      2
-    );
-    setSettingsStatus("transfer-status", `Exported ${mangaList.length}`);
+    await browser.tabs.create({
+      url: browser.runtime.getURL("html/backup.html"),
+    });
+    setSettingsStatus("transfer-status", "Opened backup page in a new tab");
   } catch (err) {
     setSettingsStatus("transfer-status", err.message || String(err), true);
   }
 });
-
-document.getElementById("copy-btn").addEventListener("click", async () => {
-  const text = document.getElementById("transfer-data").value.trim();
-  if (!text) {
-    setSettingsStatus("transfer-status", "Export first", true);
-    return;
-  }
-  try {
-    await navigator.clipboard.writeText(text);
-    setSettingsStatus("transfer-status", "✓ Copied");
-  } catch (_e) {
-    document.getElementById("transfer-data").select();
-    setSettingsStatus("transfer-status", "Select + copy manually", true);
-  }
-});
-
-document.getElementById("download-btn").addEventListener("click", () => {
-  const text = document.getElementById("transfer-data").value.trim();
-  if (!text) {
-    setSettingsStatus("transfer-status", "Export first", true);
-    return;
-  }
-  const blob = new Blob([text], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `manga-tracker-backup-${new Date().toISOString().slice(0, 10)}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-  setSettingsStatus("transfer-status", "Download started");
-});
-
-async function importFromText(raw) {
-  const parsed = parseImportPayload(raw);
-  const current = await getTrackerStorage();
-  const next = {};
-  if (parsed.hasMangaList) {
-    next.mangaList = mergeMangaLists(current.mangaList || [], parsed.mangaList);
-  }
-  if (parsed.hasAllowedSites) {
-    next.allowedSites = parsed.allowedSites;
-    document.getElementById("sites").value = parsed.allowedSites.join(", ");
-  }
-  if (parsed.hasIgnoredSites) {
-    next.ignoredSites = parsed.ignoredSites;
-    document.getElementById("ignored").value = parsed.ignoredSites.join(", ");
-  }
-  await setTrackerStorage(next);
-  if (next.mangaList) {
-    allManga = next.mangaList;
-    fillSiteFilter();
-    fillTagFilter();
-    renderList();
-  }
-  setSettingsStatus(
-    "transfer-status",
-    `✓ Imported (${(next.mangaList || current.mangaList || []).length})`
-  );
-}
-
-document.getElementById("import-btn").addEventListener("click", async () => {
-  const raw = document.getElementById("transfer-data").value.trim();
-  if (!raw) {
-    setSettingsStatus("transfer-status", "Paste JSON first", true);
-    return;
-  }
-  try {
-    await importFromText(raw);
-  } catch (err) {
-    setSettingsStatus("transfer-status", err.message || String(err), true);
-  }
-});
-
-document
-  .getElementById("import-file")
-  .addEventListener("change", async (event) => {
-    const file = event.target.files && event.target.files[0];
-    if (!file) return;
-    try {
-      const text = await file.text();
-      document.getElementById("transfer-data").value = text;
-      await importFromText(text);
-    } catch (err) {
-      setSettingsStatus("transfer-status", err.message || String(err), true);
-    } finally {
-      event.target.value = "";
-    }
-  });
 
 document.getElementById("bulk-select-btn").addEventListener("click", () => {
   setSelectMode(!selectMode);

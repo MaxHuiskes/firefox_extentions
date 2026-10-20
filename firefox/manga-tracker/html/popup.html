@@ -667,16 +667,11 @@
 
     <div class="settings-block">
       <h3>Export / Import</h3>
-      <textarea id="transfer-data" placeholder="JSON backup" spellcheck="false"></textarea>
+      <p class="settings-hint">
+        Opens in a new tab. File dialogs close the popup, so import/download must run there.
+      </p>
       <div class="btn-row">
-        <button id="export-btn" class="primary-btn" type="button">Export</button>
-        <button id="copy-btn" class="secondary-btn" type="button">Copy</button>
-        <button id="download-btn" class="secondary-btn" type="button">Download</button>
-        <button id="import-btn" class="primary-btn" type="button">Import</button>
-        <label class="file-btn">
-          Load file
-          <input id="import-file" type="file" accept="application/json,.json,text/plain">
-        </label>
+        <button id="open-backup-btn" class="primary-btn" type="button">Open backup page</button>
       </div>
       <div id="transfer-status" class="status-msg"></div>
     </div>

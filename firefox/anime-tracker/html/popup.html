@@ -668,40 +668,20 @@
     <hr>
 
     <div class="settings-block">
-      <h3>Export / Import</h3>
-      <textarea id="transfer-data" placeholder="JSON backup" spellcheck="false"></textarea>
+      <h3>Export / Import / MAL</h3>
+      <p class="settings-hint">
+        Opens in a new tab. File dialogs close the popup, so import/download must run there.
+      </p>
       <div class="btn-row">
-        <button id="export-btn" class="primary-btn" type="button">Export</button>
-        <button id="copy-btn" class="secondary-btn" type="button">Copy</button>
-        <button id="download-btn" class="secondary-btn" type="button">Download</button>
-        <button id="import-btn" class="primary-btn" type="button">Import</button>
-        <label class="file-btn">
-          Load file
-          <input id="import-file" type="file" accept="application/json,.json,text/plain">
-        </label>
+        <button id="open-backup-btn" class="primary-btn" type="button">Open backup page</button>
       </div>
       <div id="transfer-status" class="status-msg"></div>
-    </div>
-    <hr>
-
-    <div class="settings-block">
-      <h3>MyAnimeList XML</h3>
-      <p class="settings-hint">Import/export MAL animelist_*.xml (same format as MAL export).</p>
-      <div class="btn-row">
-        <button id="mal-export-btn" class="primary-btn" type="button">Export MAL XML</button>
-        <label class="file-btn">
-          Import MAL XML
-          <input id="mal-import-file" type="file" accept=".xml,text/xml,application/xml">
-        </label>
-      </div>
-      <div id="mal-status" class="status-msg"></div>
     </div>
 
   </div>
 
   <script src="../js/storage.js"></script>
   <script src="../js/gist.js"></script>
-  <script src="../js/mal.js"></script>
   <script src="../js/popup.js"></script>
 </body>
 </html>

@@ -260,23 +260,44 @@ document.getElementById("copy-btn").addEventListener("click", async () => {
   }
 });
 
-document.getElementById("download-btn").addEventListener("click", () => {
+document.getElementById("download-btn").addEventListener("click", async () => {
   const transferStatus = document.getElementById("transfer-status");
-  const text = document.getElementById("transfer-data").value.trim();
-  if (!text) {
-    setStatus(transferStatus, "Export first before downloading.", true);
-    return;
+  let text = document.getElementById("transfer-data").value.trim();
+  try {
+    if (!text) {
+      const {
+        mangaList = [],
+        allowedSites = [],
+        ignoredSites = [],
+      } = await getTrackerStorage();
+      text = JSON.stringify(
+        buildExportPayload(mangaList, allowedSites, ignoredSites),
+        null,
+        2
+      );
+      document.getElementById("transfer-data").value = text;
+    }
+    const blob = new Blob([text], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const stamp = new Date().toISOString().slice(0, 10);
+    if (browser.downloads && browser.downloads.download) {
+      await browser.downloads.download({
+        url,
+        filename: `manga-tracker-backup-${stamp}.json`,
+        saveAs: true,
+      });
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } else {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `manga-tracker-backup-${stamp}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    setStatus(transferStatus, "Download started — pick a folder in the save dialog.");
+  } catch (err) {
+    setStatus(transferStatus, err.message || String(err), true);
   }
-
-  const blob = new Blob([text], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  const stamp = new Date().toISOString().slice(0, 10);
-  a.href = url;
-  a.download = `manga-tracker-backup-${stamp}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-  setStatus(transferStatus, "Download started (or use Copy on mobile).");
 });
 
 async function importFromText(raw) {
