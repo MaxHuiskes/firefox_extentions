@@ -3,9 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <script>
+    if (/Android/i.test(navigator.userAgent) || screen.width <= 480) {
+      document.documentElement.classList.add("is-mobile");
+    }
+  </script>
   <style>
     :root {
       --pad: 14px;
+      --popup-width: 380px;
       --text: #202124;
       --muted: #5f6368;
       --border: #dadce0;
@@ -30,17 +36,23 @@
 
     * { box-sizing: border-box; }
 
+    html {
+      width: var(--popup-width);
+      max-width: var(--popup-width);
+    }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       padding: var(--pad);
       padding-bottom: max(var(--pad), env(safe-area-inset-bottom));
-      width: 100%;
-      min-width: 280px;
-      max-width: 420px;
-      margin: 0 auto;
+      width: var(--popup-width);
+      max-width: var(--popup-width);
+      min-width: var(--popup-width);
+      margin: 0;
       background: var(--bg);
       color: var(--text);
       -webkit-text-size-adjust: 100%;
+      overflow-x: hidden;
     }
 
     .header-row {
@@ -65,10 +77,10 @@
     input, select {
       width: 100%;
       margin-bottom: 10px;
-      padding: 12px;
+      padding: 8px 10px;
       border: 1px solid var(--border);
       border-radius: 8px;
-      font-size: 16px;
+      font-size: 13px;
       background: var(--card);
       color: var(--text);
     }
@@ -130,11 +142,11 @@
     button {
       cursor: pointer;
       border: none;
-      border-radius: 8px;
-      padding: 10px 14px;
+      border-radius: 4px;
+      padding: 6px 12px;
       font-weight: 600;
-      font-size: 13px;
-      min-height: 40px;
+      font-size: 12px;
+      min-height: 0;
     }
 
     .header-actions {
@@ -217,7 +229,7 @@
 
     .info {
       flex: 1;
-      font-size: 14px;
+      font-size: 13px;
       line-height: 1.35;
       min-width: 0;
       overflow: hidden;
@@ -259,19 +271,19 @@
     }
 
     .icon-btn {
-      background: #eee;
+      background: none;
       border: none;
       cursor: pointer;
-      padding: 0;
-      width: var(--tap);
-      height: var(--tap);
-      border-radius: 8px;
-      font-size: 16px;
+      padding: 4px;
+      width: auto;
+      height: auto;
+      border-radius: 4px;
+      font-size: 14px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
     }
-    body.dark .icon-btn { background: #3c4043; }
+    body.dark .icon-btn { background: none; }
 
     .empty-msg {
       font-size: 13px;
@@ -297,30 +309,139 @@
     .confirm-bar.show { display: flex; }
     .confirm-bar span { flex: 1; min-width: 120px; }
 
-    @media (max-width: 480px) {
-      body { max-width: none; padding: 16px; }
-      .header-row { flex-direction: column; align-items: stretch; gap: 12px; }
-      .header-actions { width: 100%; }
-      .header-actions button { flex: 1; min-height: var(--tap); font-size: 15px; }
-      h3 { font-size: 13px; }
-      input, select { font-size: 16px; min-height: var(--tap); }
-      li { padding: 14px 0; }
-      .info { font-size: 15px; }
-      ul { max-height: none; }
-      .filters { grid-template-columns: 1fr; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    #panel-settings {
+      max-height: min(70vh, 560px);
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
     }
 
-    @media (min-width: 481px) {
-      body { width: 420px; }
-      input, select { font-size: 13px; padding: 8px 10px; }
-      button { padding: 6px 12px; min-height: 0; font-size: 12px; border-radius: 4px; }
-      .icon-btn {
-        width: auto; height: auto; padding: 4px;
-        background: none; font-size: 14px; border-radius: 4px;
-      }
-      body.dark .icon-btn { background: none; }
-      .info { font-size: 13px; }
+    .settings-block { margin-bottom: 16px; }
+    .settings-block h3 { margin-bottom: 6px; }
+    .settings-hint {
+      font-size: 11px;
+      color: var(--muted);
+      margin: 0 0 8px;
+      line-height: 1.35;
     }
+    .settings-block textarea {
+      width: 100%;
+      min-height: 64px;
+      margin-bottom: 8px;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 12px;
+      font-family: inherit;
+      background: var(--card);
+      color: var(--text);
+      resize: vertical;
+    }
+    .settings-block .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      margin: 8px 0;
+    }
+    .toggle-row input {
+      width: 16px;
+      height: 16px;
+      margin: 0;
+      min-height: 0;
+    }
+    .settings-note {
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px;
+      margin-top: 8px;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+    .settings-note[hidden] { display: none; }
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11px;
+    }
+    .file-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #e0e0e0;
+      color: #333;
+      border-radius: 4px;
+      padding: 6px 12px;
+      font-weight: 600;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    body.dark .file-btn { background: #3c4043; color: #e8eaed; }
+    .file-btn input { display: none; }
+
+    html.is-mobile {
+      width: 100%;
+      max-width: none;
+    }
+
+    html.is-mobile body {
+      width: 100%;
+      max-width: none;
+      min-width: 0;
+      padding: 16px;
+    }
+
+    html.is-mobile .header-row {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 12px;
+    }
+
+    html.is-mobile .header-actions { width: 100%; }
+    html.is-mobile .header-actions button {
+      flex: 1;
+      min-height: var(--tap);
+      font-size: 15px;
+      border-radius: 8px;
+      padding: 10px 14px;
+    }
+    html.is-mobile h3 { font-size: 13px; }
+    html.is-mobile input,
+    html.is-mobile select {
+      font-size: 16px;
+      min-height: var(--tap);
+      padding: 12px;
+      border-radius: 8px;
+    }
+    html.is-mobile button {
+      min-height: 40px;
+      font-size: 13px;
+      border-radius: 8px;
+      padding: 10px 14px;
+    }
+    html.is-mobile .icon-btn {
+      width: var(--tap);
+      height: var(--tap);
+      padding: 0;
+      background: #eee;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+    html.is-mobile body.dark .icon-btn { background: #3c4043; }
+    html.is-mobile li { padding: 14px 0; }
+    html.is-mobile .info { font-size: 15px; }
+    html.is-mobile ul { max-height: none; }
+    html.is-mobile .filters { grid-template-columns: 1fr; }
   </style>
 </head>
 <body>
@@ -329,70 +450,135 @@
     <div class="header-actions">
       <button id="gist-sync-btn" class="primary-btn" type="button">Sync</button>
       <button id="theme-btn" class="secondary-btn" type="button" title="Dark mode">☾</button>
-      <button id="open-options-btn" class="secondary-btn" type="button">⚙</button>
+      <button id="settings-btn" class="secondary-btn" type="button" title="Settings">⚙</button>
     </div>
   </div>
 
-  <input type="text" id="title" placeholder="Anime Titel" autocomplete="off">
-  <input type="url" id="url" placeholder="Pagina URL" autocomplete="off">
-  <div class="row-2">
-    <input type="text" id="episode" placeholder="Aflevering" autocomplete="off">
-    <select id="status">
-      <option value="watching">Watching</option>
-      <option value="hold">On hold</option>
-      <option value="dropped">Dropped</option>
-      <option value="finished">Finished</option>
-    </select>
+  <div id="panel-list" class="panel active">
+    <input type="text" id="title" placeholder="Anime Titel" autocomplete="off">
+    <input type="url" id="url" placeholder="Pagina URL" autocomplete="off">
+    <div class="row-2">
+      <input type="text" id="episode" placeholder="Aflevering" autocomplete="off">
+      <select id="status">
+        <option value="watching">Watching</option>
+        <option value="hold">On hold</option>
+        <option value="dropped">Dropped</option>
+        <option value="finished">Finished</option>
+      </select>
+    </div>
+
+    <div class="top-actions">
+      <div id="status-msg" class="status-msg"></div>
+    </div>
+
+    <hr>
+    <div class="list-heading">
+      <h3>Opgeslagen Anime</h3>
+      <span id="list-count" class="count"></span>
+    </div>
+
+    <div class="filters">
+      <input type="search" id="search" placeholder="Search…" autocomplete="off">
+      <select id="sort">
+        <option value="updated">Sort: Recent</option>
+        <option value="title">Sort: Title A–Z</option>
+        <option value="episode">Sort: Episode</option>
+        <option value="status">Sort: Status</option>
+      </select>
+    </div>
+    <div class="filters">
+      <select id="filter-status">
+        <option value="all">All statuses</option>
+        <option value="watching">Watching</option>
+        <option value="hold">On hold</option>
+        <option value="dropped">Dropped</option>
+        <option value="finished">Finished</option>
+      </select>
+      <select id="filter-site">
+        <option value="all">All sites</option>
+      </select>
+    </div>
+
+    <div class="toolbar">
+      <button id="bulk-select-btn" class="secondary-btn" type="button">Select</button>
+      <button id="bulk-delete-btn" class="danger-btn" type="button" disabled>Delete selected</button>
+      <button id="ignore-site-btn" class="secondary-btn" type="button" title="Ignore current site">Ignore site</button>
+      <div id="sync-meta" class="sync-meta"></div>
+    </div>
+
+    <div id="confirm-bar" class="confirm-bar">
+      <span id="confirm-text"></span>
+      <button id="confirm-yes" class="danger-btn" type="button">Confirm</button>
+      <button id="confirm-no" class="secondary-btn" type="button">Cancel</button>
+    </div>
+
+    <ul id="anime-list"></ul>
   </div>
 
-  <div class="top-actions">
-    <div id="status-msg" class="status-msg"></div>
-  </div>
+  <div id="panel-settings" class="panel">
+    <div class="settings-block">
+      <h3>Appearance</h3>
+      <label class="toggle-row">
+        <input type="checkbox" id="dark-mode">
+        Dark mode
+      </label>
+      <label class="toggle-row">
+        <input type="checkbox" id="daily-auto-sync">
+        Daily auto-sync
+      </label>
+    </div>
 
-  <hr>
-  <div class="list-heading">
-    <h3>Opgeslagen Anime</h3>
-    <span id="list-count" class="count"></span>
-  </div>
+    <div class="settings-block">
+      <h3>Allowed sites</h3>
+      <p class="settings-hint">Comma-separated. Blank = all sites.</p>
+      <textarea id="sites" placeholder="crunchyroll.com, hianime.to"></textarea>
+      <h3>Ignored sites</h3>
+      <p class="settings-hint">Never auto-track these.</p>
+      <textarea id="ignored" placeholder="example.com"></textarea>
+      <div class="btn-row">
+        <button id="save-settings-btn" class="primary-btn" type="button">Save settings</button>
+      </div>
+      <div id="settings-status" class="status-msg"></div>
+    </div>
 
-  <div class="filters">
-    <input type="search" id="search" placeholder="Search…" autocomplete="off">
-    <select id="sort">
-      <option value="updated">Sort: Recent</option>
-      <option value="title">Sort: Title A–Z</option>
-      <option value="episode">Sort: Episode</option>
-      <option value="status">Sort: Status</option>
-    </select>
-  </div>
-  <div class="filters">
-    <select id="filter-status">
-      <option value="all">All statuses</option>
-      <option value="watching">Watching</option>
-      <option value="hold">On hold</option>
-      <option value="dropped">Dropped</option>
-      <option value="finished">Finished</option>
-    </select>
-    <select id="filter-site">
-      <option value="all">All sites</option>
-    </select>
-  </div>
+    <hr>
 
-  <div class="toolbar">
-    <button id="bulk-select-btn" class="secondary-btn" type="button">Select</button>
-    <button id="bulk-delete-btn" class="danger-btn" type="button" disabled>Delete selected</button>
-    <button id="ignore-site-btn" class="secondary-btn" type="button" title="Ignore current site">Ignore site</button>
-    <div id="sync-meta" class="sync-meta"></div>
-  </div>
+    <div class="settings-block">
+      <h3>GitHub Gist</h3>
+      <p class="settings-hint">Classic token with gist scope.</p>
+      <input type="password" id="gist-token" placeholder="ghp_..." autocomplete="off">
+      <input type="text" id="gist-id" placeholder="Gist ID" autocomplete="off">
+      <div class="btn-row">
+        <button id="gist-save" class="secondary-btn" type="button">Save</button>
+        <button id="gist-sync" class="primary-btn" type="button">Sync now</button>
+        <button id="gist-clear" class="secondary-btn" type="button">Clear</button>
+      </div>
+      <div id="gist-status" class="status-msg"></div>
+      <div id="gist-id-display" class="settings-note mono" hidden></div>
+      <div id="gist-last-sync" class="settings-note" hidden></div>
+    </div>
 
-  <div id="confirm-bar" class="confirm-bar">
-    <span id="confirm-text"></span>
-    <button id="confirm-yes" class="danger-btn" type="button">Confirm</button>
-    <button id="confirm-no" class="secondary-btn" type="button">Cancel</button>
-  </div>
+    <hr>
 
-  <ul id="anime-list"></ul>
+    <div class="settings-block">
+      <h3>Export / Import</h3>
+      <textarea id="transfer-data" placeholder="JSON backup" spellcheck="false"></textarea>
+      <div class="btn-row">
+        <button id="export-btn" class="primary-btn" type="button">Export</button>
+        <button id="copy-btn" class="secondary-btn" type="button">Copy</button>
+        <button id="download-btn" class="secondary-btn" type="button">Download</button>
+        <button id="import-btn" class="primary-btn" type="button">Import</button>
+        <label class="file-btn">
+          Load file
+          <input id="import-file" type="file" accept="application/json,.json,text/plain">
+        </label>
+      </div>
+      <div id="transfer-status" class="status-msg"></div>
+    </div>
+  </div>
 
   <script src="../js/storage.js"></script>
+  <script src="../js/gist.js"></script>
   <script src="../js/popup.js"></script>
 </body>
 </html>

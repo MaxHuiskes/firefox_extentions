@@ -27,7 +27,154 @@ function setStatusMsg(text, isError = false) {
 
 function applyDarkMode(on) {
   document.body.classList.toggle("dark", Boolean(on));
-  document.getElementById("theme-btn").textContent = on ? "☀" : "☾";
+  const themeBtn = document.getElementById("theme-btn");
+  if (themeBtn) themeBtn.textContent = on ? "☀" : "☾";
+  const darkCheck = document.getElementById("dark-mode");
+  if (darkCheck) darkCheck.checked = Boolean(on);
+}
+
+function showPanel(name) {
+  const list = document.getElementById("panel-list");
+  const settings = document.getElementById("panel-settings");
+  const settingsBtn = document.getElementById("settings-btn");
+  const title = document.getElementById("form-title");
+  const onSettings = name === "settings";
+
+  list.classList.toggle("active", !onSettings);
+  settings.classList.toggle("active", onSettings);
+  settingsBtn.textContent = onSettings ? "←" : "⚙";
+  settingsBtn.title = onSettings ? "Back" : "Settings";
+  title.textContent = onSettings
+    ? "Settings"
+    : editingIndex >= 0
+      ? "Manga Bewerken"
+      : "Manga Bewerken / Toevoegen";
+
+  if (onSettings) {
+    loadSettingsPanel();
+  }
+}
+
+function setSettingsStatus(id, text, isError = false) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.toggle("err", Boolean(isError));
+  el.textContent = text || "";
+}
+
+function parseSiteList(raw) {
+  return String(raw || "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function buildExportPayload(mangaList, allowedSites, ignoredSites) {
+  return {
+    format: "manga-tracker-backup",
+    version: 3,
+    exportedAt: new Date().toISOString(),
+    mangaList: mangaList || [],
+    allowedSites: allowedSites || [],
+    ignoredSites: ignoredSites || [],
+  };
+}
+
+function parseImportPayload(raw) {
+  const data = typeof raw === "string" ? JSON.parse(raw) : raw;
+  if (!data || typeof data !== "object") throw new Error("Invalid JSON");
+
+  const mangaList = Array.isArray(data.mangaList) ? data.mangaList : null;
+  const allowedSites = Array.isArray(data.allowedSites)
+    ? data.allowedSites
+    : null;
+  const ignoredSites = Array.isArray(data.ignoredSites)
+    ? data.ignoredSites
+    : null;
+
+  if (!mangaList && !allowedSites && !ignoredSites) {
+    throw new Error("JSON must include mangaList and/or site lists");
+  }
+  for (const item of mangaList || []) {
+    if (!item || typeof item.title !== "string" || !item.title.trim()) {
+      throw new Error("Each manga entry needs a title");
+    }
+  }
+  return {
+    mangaList: mangaList || [],
+    allowedSites: allowedSites || [],
+    ignoredSites: ignoredSites || [],
+    hasMangaList: Array.isArray(data.mangaList),
+    hasAllowedSites: Array.isArray(data.allowedSites),
+    hasIgnoredSites: Array.isArray(data.ignoredSites),
+  };
+}
+
+async function refreshGistUi() {
+  const { token, gistId } = await getGistSettings();
+  document.getElementById("gist-token").value = token;
+  document.getElementById("gist-id").value = gistId;
+
+  const display = document.getElementById("gist-id-display");
+  if (gistId) {
+    display.hidden = false;
+    display.textContent = "";
+    display.appendChild(document.createTextNode("Gist ID: "));
+    const mono = document.createElement("span");
+    mono.className = "mono";
+    mono.textContent = gistId;
+    display.appendChild(mono);
+  } else {
+    display.hidden = true;
+    display.textContent = "";
+  }
+
+  document.getElementById("gist-sync").disabled = !token;
+
+  const last = document.getElementById("gist-last-sync");
+  try {
+    const status = await browser.runtime.sendMessage({
+      action: "getGistSyncStatus",
+    });
+    const parts = [];
+    if (status && status.gistRateLimitedUntil > Date.now()) {
+      parts.push(
+        `Rate limited until ${new Date(status.gistRateLimitedUntil).toLocaleString()}`
+      );
+    }
+    if (status && status.lastGistSyncAt) {
+      const when = new Date(status.lastGistSyncAt).toLocaleString();
+      parts.push(
+        status.lastGistSyncError
+          ? `Last sync failed (${when})`
+          : `Last sync ok (${when})`
+      );
+    }
+    if (parts.length) {
+      last.hidden = false;
+      last.textContent = parts.join(" · ");
+    } else {
+      last.hidden = true;
+    }
+  } catch (_e) {
+    last.hidden = true;
+  }
+}
+
+async function loadSettingsPanel() {
+  const storage = await getTrackerStorage();
+  document.getElementById("sites").value = (storage.allowedSites || []).join(
+    ", "
+  );
+  document.getElementById("ignored").value = (storage.ignoredSites || []).join(
+    ", "
+  );
+  document.getElementById("dark-mode").checked = Boolean(storage.darkMode);
+  document.getElementById("daily-auto-sync").checked = Boolean(
+    storage.dailyAutoSync
+  );
+  await refreshGistUi();
+  await refreshSyncMeta();
 }
 
 function formatSyncMeta(status) {
@@ -217,8 +364,11 @@ browser.storage.onChanged.addListener((changes, areaName) => {
   }
 });
 
-document.getElementById("open-options-btn").addEventListener("click", () => {
-  browser.runtime.openOptionsPage();
+document.getElementById("settings-btn").addEventListener("click", () => {
+  const onSettings = document
+    .getElementById("panel-settings")
+    .classList.contains("active");
+  showPanel(onSettings ? "list" : "settings");
 });
 
 document.getElementById("theme-btn").addEventListener("click", async () => {
@@ -226,6 +376,213 @@ document.getElementById("theme-btn").addEventListener("click", async () => {
   applyDarkMode(next);
   await setTrackerStorage({ darkMode: next });
 });
+
+document.getElementById("dark-mode").addEventListener("change", async (e) => {
+  const darkMode = Boolean(e.target.checked);
+  applyDarkMode(darkMode);
+  await setTrackerStorage({ darkMode });
+});
+
+document
+  .getElementById("daily-auto-sync")
+  .addEventListener("change", async (e) => {
+    const dailyAutoSync = Boolean(e.target.checked);
+    await setTrackerStorage({ dailyAutoSync });
+    try {
+      await browser.runtime.sendMessage({ action: "setupDailyAlarm" });
+    } catch (_e) {
+      // ignore
+    }
+  });
+
+document
+  .getElementById("save-settings-btn")
+  .addEventListener("click", async () => {
+    const allowedSites = parseSiteList(document.getElementById("sites").value);
+    const ignoredSites = parseSiteList(
+      document.getElementById("ignored").value
+    );
+    const darkMode = document.getElementById("dark-mode").checked;
+    const dailyAutoSync = document.getElementById("daily-auto-sync").checked;
+    await setTrackerStorage({
+      allowedSites,
+      ignoredSites,
+      darkMode,
+      dailyAutoSync,
+    });
+    applyDarkMode(darkMode);
+    try {
+      await browser.runtime.sendMessage({ action: "setupDailyAlarm" });
+    } catch (_e) {
+      // ignore
+    }
+    setSettingsStatus("settings-status", "✓ Saved");
+  });
+
+document.getElementById("gist-save").addEventListener("click", async () => {
+  const token = document.getElementById("gist-token").value.trim();
+  const gistId = document.getElementById("gist-id").value.trim();
+  await saveGistSettings({ token, gistId });
+  await refreshGistUi();
+  setSettingsStatus(
+    "gist-status",
+    token ? "✓ Token / Gist saved" : "Cleared token"
+  );
+});
+
+document.getElementById("gist-sync").addEventListener("click", async () => {
+  const btn = document.getElementById("gist-sync");
+  try {
+    const token = document.getElementById("gist-token").value.trim();
+    const gistId = document.getElementById("gist-id").value.trim();
+    await saveGistSettings({ token, gistId });
+    btn.disabled = true;
+    setSettingsStatus("gist-status", "Syncing…");
+    const result = await browser.runtime.sendMessage({
+      action: "forceGistSync",
+    });
+    if (result && result.gistId) {
+      document.getElementById("gist-id").value = result.gistId;
+    }
+    await refreshGistUi();
+    await refreshSyncMeta();
+    const storage = await getTrackerStorage();
+    allManga = storage.mangaList || [];
+    fillSiteFilter();
+    renderList();
+    document.getElementById("sites").value = (storage.allowedSites || []).join(
+      ", "
+    );
+    document.getElementById("ignored").value = (
+      storage.ignoredSites || []
+    ).join(", ");
+    if (result && result.error) {
+      setSettingsStatus("gist-status", result.error, true);
+    } else {
+      setSettingsStatus(
+        "gist-status",
+        `✓ Synced (${result.mangaCount || 0})`
+      );
+    }
+  } catch (err) {
+    setSettingsStatus("gist-status", err.message || String(err), true);
+  } finally {
+    btn.disabled = !document.getElementById("gist-token").value.trim();
+  }
+});
+
+document.getElementById("gist-clear").addEventListener("click", async () => {
+  await clearGistSettings();
+  document.getElementById("gist-token").value = "";
+  document.getElementById("gist-id").value = "";
+  await refreshGistUi();
+  setSettingsStatus("gist-status", "GitHub sync cleared");
+});
+
+document.getElementById("export-btn").addEventListener("click", async () => {
+  try {
+    const {
+      mangaList = [],
+      allowedSites = [],
+      ignoredSites = [],
+    } = await getTrackerStorage();
+    document.getElementById("transfer-data").value = JSON.stringify(
+      buildExportPayload(mangaList, allowedSites, ignoredSites),
+      null,
+      2
+    );
+    setSettingsStatus("transfer-status", `Exported ${mangaList.length}`);
+  } catch (err) {
+    setSettingsStatus("transfer-status", err.message || String(err), true);
+  }
+});
+
+document.getElementById("copy-btn").addEventListener("click", async () => {
+  const text = document.getElementById("transfer-data").value.trim();
+  if (!text) {
+    setSettingsStatus("transfer-status", "Export first", true);
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    setSettingsStatus("transfer-status", "✓ Copied");
+  } catch (_e) {
+    document.getElementById("transfer-data").select();
+    setSettingsStatus("transfer-status", "Select + copy manually", true);
+  }
+});
+
+document.getElementById("download-btn").addEventListener("click", () => {
+  const text = document.getElementById("transfer-data").value.trim();
+  if (!text) {
+    setSettingsStatus("transfer-status", "Export first", true);
+    return;
+  }
+  const blob = new Blob([text], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `manga-tracker-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  setSettingsStatus("transfer-status", "Download started");
+});
+
+async function importFromText(raw) {
+  const parsed = parseImportPayload(raw);
+  const current = await getTrackerStorage();
+  const next = {};
+  if (parsed.hasMangaList) {
+    next.mangaList = mergeMangaLists(current.mangaList || [], parsed.mangaList);
+  }
+  if (parsed.hasAllowedSites) {
+    next.allowedSites = parsed.allowedSites;
+    document.getElementById("sites").value = parsed.allowedSites.join(", ");
+  }
+  if (parsed.hasIgnoredSites) {
+    next.ignoredSites = parsed.ignoredSites;
+    document.getElementById("ignored").value = parsed.ignoredSites.join(", ");
+  }
+  await setTrackerStorage(next);
+  if (next.mangaList) {
+    allManga = next.mangaList;
+    fillSiteFilter();
+    renderList();
+  }
+  setSettingsStatus(
+    "transfer-status",
+    `✓ Imported (${(next.mangaList || current.mangaList || []).length})`
+  );
+}
+
+document.getElementById("import-btn").addEventListener("click", async () => {
+  const raw = document.getElementById("transfer-data").value.trim();
+  if (!raw) {
+    setSettingsStatus("transfer-status", "Paste JSON first", true);
+    return;
+  }
+  try {
+    await importFromText(raw);
+  } catch (err) {
+    setSettingsStatus("transfer-status", err.message || String(err), true);
+  }
+});
+
+document
+  .getElementById("import-file")
+  .addEventListener("change", async (event) => {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      document.getElementById("transfer-data").value = text;
+      await importFromText(text);
+    } catch (err) {
+      setSettingsStatus("transfer-status", err.message || String(err), true);
+    } finally {
+      event.target.value = "";
+    }
+  });
 
 document.getElementById("bulk-select-btn").addEventListener("click", () => {
   setSelectMode(!selectMode);
@@ -378,7 +735,9 @@ function renderList() {
     return;
   }
 
-  const maxLen = window.matchMedia("(max-width: 480px)").matches ? 48 : 28;
+  const maxLen = document.documentElement.classList.contains("is-mobile")
+    ? 48
+    : 28;
 
   list.forEach((item) => {
     const key = mangaKey(item.title);
