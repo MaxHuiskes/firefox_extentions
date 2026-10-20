@@ -68,7 +68,20 @@ async function refreshGistUi() {
   const display = document.getElementById("gist-id-display");
   if (gistId) {
     display.hidden = false;
-    display.innerHTML = `Gist ID: <span class="mono">${gistId}</span><br>URL: <a href="https://gist.github.com/${gistId}" target="_blank" rel="noopener">https://gist.github.com/${gistId}</a>`;
+    display.textContent = "";
+    display.appendChild(document.createTextNode("Gist ID: "));
+    const mono = document.createElement("span");
+    mono.className = "mono";
+    mono.textContent = gistId;
+    display.appendChild(mono);
+    display.appendChild(document.createElement("br"));
+    display.appendChild(document.createTextNode("URL: "));
+    const link = document.createElement("a");
+    link.href = `https://gist.github.com/${gistId}`;
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.textContent = `https://gist.github.com/${gistId}`;
+    display.appendChild(link);
   } else {
     display.hidden = true;
     display.textContent = "";

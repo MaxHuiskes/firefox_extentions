@@ -3,12 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <script>
-    // Fixed once — never use popup-width media queries (causes desktop resize loop).
-    if (/Android/i.test(navigator.userAgent) || screen.width <= 480) {
-      document.documentElement.classList.add("is-mobile");
-    }
-  </script>
+  <script src="../js/popup-boot.js"></script>
   <style>
     :root {
       --pad: 14px;

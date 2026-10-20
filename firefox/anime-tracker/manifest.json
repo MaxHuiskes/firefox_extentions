@@ -1,12 +1,12 @@
 {
   "manifest_version": 3,
   "name": "Anime Progress Tracker",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Track anime progress. Sync via GitHub Gist, JSON backup, or MyAnimeList XML import/export.",
   "icons": {
-    "16": "images/icon.png",
-    "48": "images/icon.png",
-    "128": "images/icon.png"
+    "16": "images/icon-16.png",
+    "48": "images/icon-48.png",
+    "128": "images/icon-128.png"
   },
   "permissions": [
     "storage",
@@ -24,7 +24,12 @@
     "scripts": ["js/storage.js", "js/gist.js", "js/background.js"]
   },
   "action": {
-    "default_popup": "html/popup.html"
+    "default_popup": "html/popup.html",
+    "default_icon": {
+      "16": "images/icon-16.png",
+      "48": "images/icon-48.png",
+      "128": "images/icon-128.png"
+    }
   },
   "options_ui": {
     "page": "html/options.html",
